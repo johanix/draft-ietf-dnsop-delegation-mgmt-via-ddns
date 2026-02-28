@@ -179,11 +179,11 @@ The DNS UPDATE in this case is essentially a message that says:
 # Terminology
 
 SIG(0)
-: An assymmetric signing algorithm that allows the recipient to only
+: An asymmetric signing algorithm that allows the recipient to only
   need to know the public key to verify a signature created by the
   senders private key.
 
-# Updating Delegation Information via DNS UPDATEs.
+# Updating Delegation Information via DNS UPDATEs
 
 This is not a new idea. There is lots of prior art and prior
 documents, including the expired
@@ -193,7 +193,7 @@ The functionality to update delegation information in the parent zone
 via DNS UPDATE has been available for years in a least one DNS
 implementation (BIND9). However, while DNS UPDATE is used extensively
 inside organisations it has not seen much use across organisational
-boundaries. And zone cuts, almost by definition, usually cuts across
+boundaries. And zone cuts, almost by definition, usually cut across
 such boundaries.
 
 When sending a DNS UPDATE it is necessary to know where to send
@@ -206,7 +206,7 @@ likely to be protected by firewalls and other measures).
 This constitutes a problem for using DNS UPDATES across zone cuts.
 
 Another concern is that traditionally DNS UPDATEs are sent to a
-primary nameserver, and if the update signture verifies the update is
+primary nameserver, and if the update signature verifies the update is
 automatically applied to the DNS zone. This is often not an acceptable
 mechanism. The recipient may, for good reason, require additional
 policy checks and likely an audit trail. Finally, the change should in
@@ -219,7 +219,7 @@ delegation information.
 Both problems are addressed by the proposed mechanism for locating the
 recipient of a generalized NOTIFY.
 
-# Locating the Target for a generalized NOTIFY and/or DNS UPDATE.
+# Locating the Target for a generalized NOTIFY and/or DNS UPDATE
 
 Section 3 of {{!RFC9859}} defines a new RR type, DSYNC, that has the
 following format:
@@ -321,7 +321,7 @@ requirements are also fulfilled the change may be applied to the
 parent zone in whatever manner the parent zone is maintained (as a
 text file, data in a database, via and API, etc).
 
-# Interpretation of the response to the DNS UPDATE.
+# Interpretation of the response to the DNS UPDATE
 
 All DNS transactions are designed as a pair of messages and this is
 true also for DNS UPDATE. The interpretation of the different
@@ -359,7 +359,7 @@ transit) or the response was not sent (or lost in transit).
 
 For this reason it is suggested that a lack of response is left as
 implementation dependent. That way the implementation has sufficient
-freedom do chose a sensible approach. Eg. if the sender of the DNS
+freedom to chose a sensible approach. Eg. if the sender of the DNS
 UPDATE message (perhaps the primary name server of the child zone) only
 serves a single child, then resending the DNS UPDATE once or twice may
 be ok (to ensure that the lack of response is not due to packets being
@@ -409,7 +409,7 @@ this child (CLASS=ANY in a DNS UPDATE is a request to delete an entire
 RRset). The second is an instruction to add the new key.
 
 When receiving such a message (where the self-signature validates) the
-parent UPDATE Reciever SHOULD mark that key as "known" (but not yet
+parent UPDATE Receiver SHOULD mark that key as "known" (but not yet
 trusted) and then either put that key into a queue for later look up
 and validation of the corresponding KEY record (if supporting
 automatic bootstrap) or put that key into a queue for subsequent
@@ -481,7 +481,7 @@ is as secure as if the child zone had been signed.
 ### Automatic Bootstrap When Child Zone Is Unsigned
 
 Hence, to bootstrap the public SIG(0) key for a child zone it is
-possible for the parent use a "bootstrap policy" a la:
+possible for the parent to use a "bootstrap policy" a la:
 
 * Look up the KEY RRset in the child zone. Compare to the child KEY
   received in the self-signed DNS UPDATE.
@@ -533,14 +533,14 @@ Another method is to utilize the same mechanism as used in
 {{?I-D.berra-dnsop-announce-scanner}} to announce details about CDS and
 CSYNC scanner capabilities. This mechanism uses an SVCB record located
 at the target of the DSYNC record to announce capabilities. For the
-UPDATE Receiver the important capabilites are primarily supported
+UPDATE Receiver the important capabilities are primarily supported
 bootstrap methods.
 
-#### SVCB Key "bootstrap"
+#### SvcParamKey "bootstrap"
 
-The "bootstrap" key is used to signal what mechanisms are supported for
-upgrading an unsigned delegation to a signed delegation. Three mechanisms
-are currently identified:
+The "bootstrap" SvcParamKey in the SVCB record is used to signal what
+mechanisms are supported for bootstrapping the trust of the child's public
+SIG(0) key to the UPDATE Receiver. Three mechanisms are currently identified:
 
   * "at-apex": This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key for signed
@@ -585,8 +585,8 @@ New mechanisms are likely to be defined in the future.
 #### Complete Example
 
 Example for a parent that operates an UPDATE Receiver that only
-support the secure automatic bootstrap methods "at-apex" and
-"at-ns". Otherwise manual bootstrap is needed.
+supports the secure automatic bootstrap methods "at-apex" and
+"at-ns". Otherwise "manual" bootstrap is needed.
 
     _dsync.parent.example.   IN  DSYNC ANY UPDATE 0 updater.parent.example.
     updater.parent.example.  IN  SVCB 0 . (bootstrap="at-apex,at-ns,manual")
@@ -661,7 +661,7 @@ the following "states":
 
 * "Automatic bootstrap of SIG(0) keys not supported; manual bootstrap
   required": indicating that while the parent does support delegation
-  sychronization via DNS UPDATE, it does only support manual
+  synchronization via DNS UPDATE, it does only support manual
   bootstrap.
   
 ## Communication To Inquire State
@@ -675,10 +675,10 @@ intentionally, limited to:
   information.
 
 * no information except the actual error code is meant for automatic
-  processing. it is therefore not possible to communicate things like,
-  eg. a KeyId via EDE.
+  processing. It is therefore not possible to communicate things like,
+  eg. a KeyId via Extended DNS Errors.
   
-The communication between child and parent would gain from the
+The communication between child and parent would benefit from the
 addition of the ability to also send inquiries to the parent:
 
 * For the child to be able to inquire about the state of the
@@ -698,7 +698,7 @@ specified in {{?I-D.berra-dnsop-keystate}}.
 
 In a traditional DNS UPDATE only the sender (i.e. the child in this
 case) of the UPDATE is providing information. The receiver is only a
-consumer of the information (assuming that the receiver able to
+consumer of the information (assuming that the receiver is able to
 validate the SIG(0) signature of the sender, and that the UPDATE
 adheres to policy, etc).
 
@@ -731,7 +731,7 @@ consuming service. Among the issues are rate-limiting by large DNS
 operators and inherent difficulties in issuing millions of recursive
 DNS queries where all received data must be validated.
 
-By comparision, the DNS UPDATE based mechanism for automatic
+By comparison, the DNS UPDATE based mechanism for automatic
 synchronization shifts most of the effort to the child side. It is the
 child that is responsible for detecting the need to update the
 delegation information in the parent zone (which makes sense as it is
@@ -749,7 +749,7 @@ task of the UPDATE Receiver is mostly focused on the policy issues of
 whether to approve the UPDATE or not (i.e. the same process that a CDS
 and/or CSYNC scanner follows).
 
-# Security Considerations.
+# Security Considerations
 
 Any fully automatic mechanism to update the contents of a DNS zone
 opens up a potential vulnerability should the mechanism not be
@@ -775,7 +775,7 @@ from any parent name server even in the worst case the only service
 that can be subject to an attack is the UPDATE Receiver itself, which
 is a service that previously did not exist.
 
-# IANA Considerations.
+# IANA Considerations
 
 IANA is requested to assign a new "scheme" value to the registry for
 "DSYNC Location of Synchronization Endpoints" as follows:
@@ -789,7 +789,7 @@ Reference
 
 -------
 
-# Acknowledgements.
+# Acknowledgements
 
 * Peter Thomassen and I together came up with the location mechanism
   for the generalized notifications, which this draft relies upon.
