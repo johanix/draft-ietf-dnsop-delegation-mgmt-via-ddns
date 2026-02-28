@@ -1,6 +1,6 @@
 # DNS Delegation Management via Dynamic Update
 
-This is the working area for the individual Internet-Draft, "DNS Delegation Management via DDNS".
+This is the working area for the DNSOP WG Internet-Draft, "DNS Delegation Management via DDNS".
 
 ## Contributing
 
