@@ -1,7 +1,7 @@
 ---
 title: "Automating DNS Delegation Management via DDNS"
 abbrev: DDNS Updates of Delegation Information
-docname: draft-ietf-dnsop-delegation-mgmt-via-ddns-00
+docname: draft-ietf-dnsop-delegation-mgmt-via-ddns-02
 date: {DATE}
 category: std
 
@@ -46,14 +46,17 @@ zone. However, in practice that is not always the case.
 When the delegation information is not in sync the child zone is
 usually working fine, but without the amount of redundancy that the
 zone owner likely expects to have. Hence, should any further problems
-ensue it could have catastropic consequences.
+ensue it could have catastrophic consequences.
 
 The DNS name space has lived with this problem for decades and it
 never goes away. Or, rather, it will never go away until a fully
 automated mechanism for how to keep the information in sync
 automatically is deployed.
 
-This document proposes such a mechanism.
+This document proposes such a mechanism based on DNS Dynamic Updates
+(DDNS) secured with SIG(0) signatures, sent from the child to the
+parent across the zone cut. The target of the update is discovered
+via the DSYNC record defined in {{!RFC9859}}.
 
 TO BE REMOVED: This document is being collaborated on in Github at:
 [https://github.com/johanix/draft-ietf-dnsop-delegation-mgmt-via-ddns](https://github.com/johanix/draft-ietf-dnsop-delegation-mgmt-via-ddns).
@@ -88,8 +91,8 @@ updating of delegation information in the parent zone for a child
 zone based on DNS Dynamic Updates secured with SIG(0) signatures. 
 
 This alternative mechanism shares the property of being efficient
-and provide rapid convergence (similar to generalized notifications in
-conjuction with scanners). Furthermore, it has the advantages of not
+and provides rapid convergence (similar to generalized notifications in
+conjunction with scanners). Furthermore, it has the advantages of not
 requiring any scanners in the parent at all and also not being
 dependent on the child (and parent) being DNSSEC-signed.
 
@@ -106,6 +109,23 @@ The key words "**MUST**", "**MUST NOT**", "**REQUIRED**", "**SHALL**",
 "**NOT RECOMMENDED**", "**MAY**", and "**OPTIONAL**" in this document
 are to be interpreted as described in BCP 14 {{!RFC2119}} {{!RFC8174}}
 when, and only when, they appear in all capitals, as shown here.
+
+## Terminology
+
+SIG(0)
+: An asymmetric signing algorithm that allows the recipient to only
+  need to know the public key to verify a signature created by the
+  sender's private key.
+
+UPDATE Receiver
+: The entity that receives and processes DNS UPDATE messages on behalf
+  of the parent zone. This may be the parent primary name server or a
+  separate dedicated service.
+
+Bootstrap
+: The process of establishing initial trust in a SIG(0) public key.
+  A key that has been received but not yet validated is "known"; once
+  validated it is promoted to "trusted".
 
 # Is there a Use Case?
 
@@ -152,7 +172,7 @@ should trigger any changes in the DNS data provided by the recipient.
 
 The difference between the UPDATE and the NOTIFY is that the UPDATE
 contains the exact change that should (in the opinion of the sender)
-be applied to the recipients DNS data. Furthermore, for secure Dynamic
+be applied to the recipient's DNS data. Furthermore, for secure Dynamic
 Updates, the message also contains proof why the update should be
 trusted (in the form of a digital signature by a key that the
 recipient trusts).
@@ -176,13 +196,6 @@ The DNS UPDATE in this case is essentially a message that says:
     is the exact change; here is the proof that the change is
     authentic, please verify this signature"
 
-# Terminology
-
-SIG(0)
-: An asymmetric signing algorithm that allows the recipient to only
-  need to know the public key to verify a signature created by the
-  senders private key.
-
 # Updating Delegation Information via DNS UPDATEs
 
 This is not a new idea. There is lots of prior art and prior
@@ -190,7 +203,7 @@ documents, including the expired
 I-D.andrews-dnsop-update-parent-zones-04.
 
 The functionality to update delegation information in the parent zone
-via DNS UPDATE has been available for years in a least one DNS
+via DNS UPDATE has been available for years in at least one DNS
 implementation (BIND9). However, while DNS UPDATE is used extensively
 inside organisations it has not seen much use across organisational
 boundaries. And zone cuts, almost by definition, usually cut across
@@ -216,8 +229,8 @@ of provisioning system or a database.
 This creates another problem for using DNS UPDATEs for managing
 delegation information.
 
-Both problems are addressed by the proposed mechanism for locating the
-recipient of a generalized NOTIFY.
+Both problems are addressed by the target location mechanism defined
+in {{!RFC9859}}, described in the next section.
 
 # Locating the Target for a generalized NOTIFY and/or DNS UPDATE
 
@@ -279,7 +292,7 @@ DSYNC record that matches the qname in the DNS query.`
 
 DNS UPDATE is in wide use all over the world, for all sorts of
 purposes. It is not in wide use across organizational boundaries. This
-document only address the specific case of a child zone that makes a
+document only addresses the specific case of a child zone that makes a
 change in its DNS delegation information that will require an update
 of the corresponding information in the parent zone. This includes:
 
@@ -307,7 +320,7 @@ updates to the NS RRset, glue and DS RRset).
 
 Furthermore, it is strongly recommended that the policy is further
 tightened by only allowing updates to the delegation information of a
-child zone with the exact same name as the name of the SIG(0) key the
+child zone with the exact same name as the name of the SIG(0) key that
 signed the UPDATE request. I.e. an UPDATE request for the delegation
 information for the zone `child.parent.` should only be processed if
 it is signed by a SIG(0) key with the name `child.parent.` and the
@@ -316,10 +329,10 @@ signature verifies correctly.
 Once the DNS UPDATE message has been verified to be correctly signed
 by a known and trusted key with the correct name and also adhere to
 the update policy it should be subjected to the same set of
-correctness tests as CDS/CSYNC scanner would have performed. If these
+correctness tests as a CDS/CSYNC scanner would have performed. If these
 requirements are also fulfilled the change may be applied to the
 parent zone in whatever manner the parent zone is maintained (as a
-text file, data in a database, via and API, etc).
+text file, data in a database, via an API, etc).
 
 # Interpretation of the response to the DNS UPDATE
 
@@ -359,7 +372,7 @@ transit) or the response was not sent (or lost in transit).
 
 For this reason it is suggested that a lack of response is left as
 implementation dependent. That way the implementation has sufficient
-freedom to chose a sensible approach. Eg. if the sender of the DNS
+freedom to choose a sensible approach. Eg. if the sender of the DNS
 UPDATE message (perhaps the primary name server of the child zone) only
 serves a single child, then resending the DNS UPDATE once or twice may
 be ok (to ensure that the lack of response is not due to packets being
@@ -373,7 +386,7 @@ likely pointless.
 
 Only the child should have access to the SIG(0) private key. The
 corresponding SIG(0) public key should preferably be published in DNS,
-but it doesn't have have to be. The SIG(0) public key only needs to be
+but it doesn't have to be. The SIG(0) public key only needs to be
 available to the parent DNS UPDATE Receiver. Keeping all the public
 SIG(0) keys for different child zones in some sort of database is
 perfectly fine.
@@ -523,13 +536,9 @@ from a larger number of vantage points.
 
 As there are multiple possible methods to bootstrap the initial SIG(0)
 public key to become trusted by the parent it becomes important for
-child zone operators to be able to find out which method to use. One
-alternative would be to send this information inside the KeyState
-EDNS(0) option that is already needed to inquire state for specific
-keys. This does have the drawback of being less visible and
-potentially more difficult to use operationally.
+child zone operators to be able to find out which method to use.
 
-Another method is to utilize the same mechanism as used in
+This document utilizes the same mechanism as used in
 {{?I-D.berra-dnsop-announce-scanner}} to announce details about CDS and
 CSYNC scanner capabilities. This mechanism uses an SVCB record located
 at the target of the DSYNC record to announce capabilities. For the
@@ -540,7 +549,7 @@ bootstrap methods.
 
 The "bootstrap" SvcParamKey in the SVCB record is used to signal what
 mechanisms are supported for bootstrapping the trust of the child's public
-SIG(0) key to the UPDATE Receiver. Three mechanisms are currently identified:
+SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
 
   * "at-apex": This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key for signed
@@ -594,7 +603,101 @@ supports the secure automatic bootstrap methods "at-apex" and
 I.e. this UPDATE Receiver does not support the "unsigned" method based
 on {{!RFC8078}}.
 
-## Rolling the SIG(0) Key 
+## Communication Between Child and Parent UPDATE Receiver
+
+There are two cases where communication between child and parent
+UPDATE Receiver would benefit greatly from some additional
+information.
+
+### Communication in Case of Errors
+
+An error response from the parent UPDATE Receiver would be improved by
+more detail provided via a set of new Extended DNS Error Codes
+{{!RFC8914}}. In particular, it would be useful to be able to express
+the following "states":
+
+* "SIG(0) key is known, but not yet trusted": indicating that
+  bootstrap of the key is not yet complete. Waiting may resolve the
+  issue.
+
+* "SIG(0) key is known, but validation failed": indicating that
+  bootstrap has failed and waiting will not resolve the issue.
+
+* "Automatic bootstrap of SIG(0) keys not supported; manual bootstrap
+  required": indicating that while the parent does support delegation
+  synchronization via DNS UPDATE, it only supports manual
+  bootstrap. Note that the child should normally discover this via the
+  SVCB "bootstrap" SvcParamKey before attempting automatic bootstrap;
+  this error serves as a fallback for cases where that discovery was
+  not performed or the SVCB record was not available.
+
+### Communication To Inquire State
+
+Extended DNS Errors {{!RFC8914}} provides an excellent mechanism
+for adding more detail to error responses. However it is,
+intentionally, limited to:
+
+* returning extra information from the receiver to the original
+  sender. It is not possible to "send" information, only "return"
+  information.
+
+* no information except the actual error code is meant for automatic
+  processing. It is therefore not possible to communicate things like,
+  eg. a KeyId via Extended DNS Errors.
+
+The communication between child and parent would benefit from the
+addition of the ability to also send inquiries to the parent. For
+example, the child should be able to inquire about key state: "I
+operate under the assumption that the key {key} is known and trusted
+by you (the parent). Is this correct?"
+
+{{?I-D.berra-dnsop-keystate}} is proposed as a mechanism to improve
+the communication between child and parent, both in the error case and
+in the inquiry case. If that draft is supported then the above
+example would travel as "KeyState codes" in a KeyState OPT as
+specified in {{?I-D.berra-dnsop-keystate}}.
+
+## Mutual Authentication and the UPDATE Receiver SIG(0) Key
+
+For the KeyState communication described above to be trustworthy, the
+child must be able to verify that responses from the UPDATE Receiver
+are authentic. Otherwise an adversary could potentially cause
+disruption by sending forged responses, e.g. falsely claiming that
+the child's key is unknown and triggering an unnecessary re-bootstrap.
+
+For this reason the UPDATE Receiver SHOULD also maintain a SIG(0) key
+pair and use its private key to sign responses to the child. This
+enables mutual authentication: the child authenticates to the parent
+via its SIG(0) signature on the UPDATE, and the parent authenticates
+to the child via its SIG(0) signature on the response.
+
+### Publishing the UPDATE Receiver SIG(0) Key
+
+The UPDATE Receiver SHOULD publish its public SIG(0) key as a KEY
+record at the domain name that is the {target} of the DSYNC record.
+Example:
+
+    _dsync.parent.example.      IN DSYNC ANY UPDATE 0 updater.parent.example.
+    updater.parent.example.     IN KEY ...
+
+### Bootstrapping the UPDATE Receiver Key to the Child
+
+The child needs to acquire and validate the UPDATE Receiver's public
+SIG(0) key before it can verify signed responses. Two methods are
+defined:
+
+  * If the KEY record for the UPDATE Receiver is located in a
+    DNSSEC-signed zone (which is expected in the common case where
+    the parent zone is DNSSEC-signed), the child looks up the KEY
+    record and performs standard DNSSEC validation. On validation
+    success the key is trusted.
+
+  * If the KEY record is not in a DNSSEC-signed zone, manual
+    bootstrap is required. The same out-of-band mechanisms available
+    for bootstrapping the child key (email, web form, etc.) may be
+    used in reverse.
+
+## Rolling the SIG(0) Key
 
 Once the parent (or registrar) DNS UPDATE Receiver has the key, the
 child can update it via a DNS UPDATE just like updating the NS RRset,
@@ -638,85 +741,6 @@ the potential attack vector of an adversary causing a parent to
 invalidate the child key by just sending a self-signed bootstrap
 UPDATE (which will not validate, but if the old key is deleted then
 the harm would already be done).
-
-# Communication Between Child and Parent UPDATE Receiver 
-
-There are two cases where communication between child and parent
-UPDATE Receiver would benefit greatly from some additional
-information.
-
-## Communication in Case of Errors
-
-An error response from the parent UPDATE Receiver would be improved by
-more detail provided via a set of new Extended DNS Error Codes
-{{!RFC8914}}. In particular, it would be useful to be able to express
-the following "states":
-
-* "SIG(0) key is known, but not yet trusted": indicating that
-  bootstrap of the key is not yet complete. Waiting may resolve the
-  issue.
-
-* "SIG(0) key is known, but validation failed": indicating that
-  bootstrap has failed and waiting will not resolve the issue.
-
-* "Automatic bootstrap of SIG(0) keys not supported; manual bootstrap
-  required": indicating that while the parent does support delegation
-  synchronization via DNS UPDATE, it does only support manual
-  bootstrap.
-  
-## Communication To Inquire State
-
-Extended DNS Errors {{!RFC8914}} provides an excellent mechanism
-for adding more detail to error responses. However it is,
-intentionally, limited to:
-
-* returning extra information from the receiver to the original
-  sender. It is not possible to "send" information, only "return"
-  information.
-
-* no information except the actual error code is meant for automatic
-  processing. It is therefore not possible to communicate things like,
-  eg. a KeyId via Extended DNS Errors.
-  
-The communication between child and parent would benefit from the
-addition of the ability to also send inquiries to the parent:
-
-* For the child to be able to inquire about the state of the
-  parent. I.e. "I operate under the assumption that the key {key} is
-  known and trusted by you (the parent). Is this correct?"
-  
-* For the child to inquire about things: "Do you (parent) support
-  automatic bootstrapping or not?"
-  
-{{?I-D.berra-dnsop-keystate}} is proposed as a mechanism to improve
-the communication between child and parent, both in the error case and
-in the inquiry case. If that draft is supported then all of the above
-examples would travel as a new "KeyState codes" in a KeyState OPT as
-specified in {{?I-D.berra-dnsop-keystate}}.
-
-## Mutual Authentication 
-
-In a traditional DNS UPDATE only the sender (i.e. the child in this
-case) of the UPDATE is providing information. The receiver is only a
-consumer of the information (assuming that the receiver is able to
-validate the SIG(0) signature of the sender, and that the UPDATE
-adheres to policy, etc).
-
-However, in the proposed mechanism with the new KeyState OPT the
-UPDATE Receiver can also send information back to the sender (the
-child). One example is details about the SIG(0) key bootstrap policy
-of the parent.  This opens up the possibility for an adversary to
-potentially cause disruption by sending forged responses to the child.
-
-For this reason the current proposal is that the UPDATE Receiver also
-maintains a SIG(0) key pair, including publication of the public key
-in DNS. This key is then used to sign responses to the child. This
-requires that the child goes though a similar bootstrap process to get
-the public key of the UPDATE Receiver as the parent does.
-
-Once such bootstrap is complete the child can use the public key of
-the UPDATE Receiver to verify the authenticity of responses from the
-UPDATE Receiver, thereby making the mutual authentication complete.
 
 # Scalability Considerations
 
@@ -807,8 +831,27 @@ Reference
 # Change History (to be removed before publication)
 
 * draft-ietf-dnsop-delegation-mgmt-via-ddns-01
-  
-> Large number of nits addressed (thanks to Yorgos Thessalonikefs)
+
+> Large number of editorial nits addressed (thanks to Yorgos Thessalonikefs)
+
+> Replaced the hand-waving "Mutual Authentication" section with a
+> concrete specification for where the UPDATE Receiver publishes its
+> SIG(0) public key and how the child validates it (DNSSEC validation
+> or manual bootstrap).
+>
+> Moved "Communication Between Child and Parent UPDATE Receiver" and
+> "Mutual Authentication" to directly after the child key bootstrap
+> sections, so that the motivation (KeyState communication) directly
+> precedes the solution (mutual authentication via the parent's SIG(0)
+> key).
+>
+> Removed the policy inquiry references that were made obsolete by
+> the SVCB "bootstrap" SvcParamKey mechanism.
+>
+> Moved Terminology to the Introduction and added definitions for
+> UPDATE Receiver and Bootstrap.
+>
+> Expanded the abstract to describe the proposed mechanism.
 
 * draft-ietf-dnsop-delegation-mgmt-via-ddns-00
 
