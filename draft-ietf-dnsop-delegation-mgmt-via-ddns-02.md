@@ -430,19 +430,19 @@ arbitrary delegation information. The integrity of the entire
 mechanism rests on the SIG(0) key remaining unforgeable for the
 operational lifetime of the delegation.
 
-For this reason the SIG(0) key SHOULD use an algorithm that is
-expected to remain secure against a cryptographically relevant
-quantum computer (CRQC). Suitable post-quantum signature algorithms
-include ML-DSA {{?FIPS204}} and SLH-DSA {{?FIPS205}}.
-
 The DNS UPDATEs described in this document are infrequent and are
 carried over TCP. Unlike DNSSEC validation traffic, which is
 size-sensitive because of the per-query UDP path, this path imposes
 no significant wire-size constraint on the SIG(0) signature. The
-larger public keys and signatures of post-quantum algorithms are
-therefore not a deployment obstacle for SIG(0) on the DDNS UPDATE
-path even though they would be a serious obstacle on most
-ordinary DNSSEC paths.
+larger public keys and signatures of post-quantum algorithms would
+therefore not be a deployment obstacle for SIG(0) on the DDNS UPDATE
+path even though they would be a serious obstacle on most ordinary
+DNSSEC paths. As post-quantum signature algorithms such as ML-DSA
+{{?FIPS204}} and SLH-DSA {{?FIPS205}} become standardized for
+DNSSEC use and are supported by parent UPDATE Receivers, child
+operators are encouraged to adopt them for the SIG(0) key on this
+path: there is no operational reason to prefer a classical
+algorithm here.
 
 ## Bootstrapping the SIG(0) Public Key Into the DNS UPDATE Receiver
 
