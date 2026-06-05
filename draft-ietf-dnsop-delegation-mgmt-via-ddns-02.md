@@ -951,6 +951,25 @@ for the name pattern in which this label is used.
 
 # Change History (to be removed before publication)
 
+* draft-ietf-dnsop-delegation-mgmt-via-ddns-02
+
+> Restructured §Management of SIG(0) Public Keys to expose the
+> two-direction bootstrap symmetry: §Mutual Authentication now
+> motivates a single §Bootstrapping SIG(0) Public Keys chapter
+> with subsections for the child's key and the UPDATE Receiver's
+> key.
+
+> Added §Choice of SIG(0) Signature Algorithm covering the case
+> for adopting a PQ-safe algorithm on this path once available.
+
+> Added §Operator coordination via HSYNCPARAM (a `pubkey` key in
+> the HSYNCPARAM record from draft-leon-dnsop-signaling-zone-owner-intent)
+> for the at-ns bootstrap method, and an IANA request for a
+> (KEY, _signal) entry in the RFC 8552 registry.
+
+> Added baseline retry policy for missing UPDATE responses, plus
+> minor structural and editorial polish.
+
 * draft-ietf-dnsop-delegation-mgmt-via-ddns-01
 
 > Large number of editorial nits addressed (thanks to Yorgos Thessalonikefs)
