@@ -481,15 +481,15 @@ and validation of the corresponding KEY record (if supporting
 automatic bootstrap) or put that key into a queue for subsequent
 manual validation and verification.
 
-### Automatic Bootstrap of the SIG(0) Public Key
-
 Automated bootstrapping is also possible, subject to the policy of the
 UPDATE Receiver. The basic idea is to publish the public SIG(0) key as
 a KEY record either at the child apex or at a special name below the
 name of an authoritative nameserver for the zone located in a DNSSEC-
 signed zone. This publication must occur prior to the initial key
 upload. Then the UPDATE Receiver (or an agent) may look that KEY up
-for subsequent validation.
+for subsequent validation. The following three subsections describe
+the three automatic bootstrap methods this document defines, one per
+case of child-zone signing status.
 
 ### Automatic Bootstrap When Child Zone Is DNSSEC-signed
 
@@ -550,8 +550,7 @@ bootstrap as described in {{!RFC9615}}. As the proof of the SIG(0) key
 being authentic is based on a clear DNSSEC signature chain this method
 is as secure as if the child zone had been signed.
 
-#### Operator coordination via HSYNCPARAM
-
+**Operator coordination via HSYNCPARAM.**
 The KEY record at `_sig0key.{child}._signal.{nameserver}.` must be
 published by the operator of the nameserver's zone, not by the
 operator of the child zone. The child operator therefore needs a
@@ -615,7 +614,7 @@ previous methods but it is possible to make on-path attacks
 arbitrarily difficult by using a larger number of repeated queries
 from a larger number of vantage points.
 
-### Publishing Supported Bootstrap Methods
+## Publishing Supported Bootstrap Methods
 
 As there are multiple possible methods to bootstrap the initial SIG(0)
 public key to become trusted by the parent it becomes important for
@@ -628,7 +627,7 @@ at the target of the DSYNC record to announce capabilities. For the
 UPDATE Receiver the important capabilities are primarily supported
 bootstrap methods.
 
-#### SvcParamKey "bootstrap"
+### SvcParamKey "bootstrap"
 
 The "bootstrap" SvcParamKey in the SVCB record is used to signal what
 mechanisms are supported for bootstrapping the trust of the child's public
@@ -674,7 +673,7 @@ mechanisms, separated by ",". The mechanisms may occur in arbitrary order.
 
 New mechanisms are likely to be defined in the future.
 
-#### Complete Example
+### Complete Example
 
 Example for a parent that operates an UPDATE Receiver that only
 supports the secure automatic bootstrap methods "at-apex" and
