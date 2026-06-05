@@ -370,7 +370,7 @@ The case of no response is more complex, as it is not possible to know
 whether the DNS UPDATE actually reached the receiver (or was lost in
 transit) or the response was not sent (or lost in transit).
 
-For this reason it is suggested that a lack of response is left as
+For this reason the exact response to a missing reply is left as
 implementation dependent. That way the implementation has sufficient
 freedom to choose a sensible approach. Eg. if the sender of the DNS
 UPDATE message (perhaps the primary name server of the child zone) only
@@ -381,6 +381,15 @@ number of child zones below the same parent zone, then it may already
 know that the receiver for the DNS UPDATEs is not responding for any
 of the child zones, and then resending the update immediately is
 likely pointless.
+
+As a baseline for senders that do retry: a sender SHOULD wait at
+least 5 seconds before treating the absence of a response as a
+timeout, SHOULD apply exponential backoff between successive retries
+(e.g. doubling the interval each time), and SHOULD give up after no
+more than 5 retries for a given UPDATE. These numbers are intended
+as defaults that an implementation may override based on local
+knowledge (such as the per-receiver observations described above);
+they are not normative wire-protocol requirements.
 
 # Management of SIG(0) Public Keys
 
@@ -772,6 +781,15 @@ Hence, as the data collection and validation is much simplified the
 task of the UPDATE Receiver is mostly focused on the policy issues of
 whether to approve the UPDATE or not (i.e. the same process that a CDS
 and/or CSYNC scanner follows).
+
+Note that this is a shift of complexity, not an elimination of it.
+The receiver-side policy checks, audit trail, and integration with
+the parent's provisioning system are still required, just as they
+would be for a scanner-based mechanism. The principal scalability
+gain is the avoidance of the scanning round-trip latency: the parent
+no longer needs to poll every child zone on a fixed cadence in order
+to detect a change, because the child updates the parent at the
+moment the change happens.
 
 # Security Considerations
 
