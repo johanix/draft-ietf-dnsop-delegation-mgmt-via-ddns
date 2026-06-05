@@ -434,7 +434,7 @@ The DNS UPDATEs described in this document are infrequent and are
 carried over TCP. Unlike DNSSEC validation traffic, which is
 size-sensitive because of the per-query UDP path, this path imposes
 no significant wire-size constraint on the SIG(0) signature. The
-larger public keys and signatures of post-quantum algorithms would
+larger public keys and signatures of post-quantum algorithms will
 therefore not be a deployment obstacle for SIG(0) on the DDNS UPDATE
 path even though they would be a serious obstacle on most ordinary
 DNSSEC paths. As post-quantum signature algorithms such as ML-DSA
@@ -532,6 +532,12 @@ for child.parent.  may be located at the special label
     _sig0key.child.parent._signal.ns.provider.example. IN KEY ...
     _sig0key.child.parent._signal.ns.provider.example. IN RRSIG KEY ...
 
+The underscored globally scoped label `_signal` in this name pattern
+is the one registered by {{!RFC9615}} for DNSSEC bootstrap (see
+{{iana}}). The leading `_sig0key` label is introduced by this
+document to distinguish the SIG(0) bootstrap use case from the
+CDS/CDNSKEY use case defined in {{!RFC9615}}.
+
 In case of validation success the key SHOULD be promoted to "trusted"
 by the UPDATE Receiver. At this point any old keys should be deleted.
 
@@ -543,6 +549,32 @@ This bootstrap mechanism is identical to the method used for DNSSEC
 bootstrap as described in {{!RFC9615}}. As the proof of the SIG(0) key
 being authentic is based on a clear DNSSEC signature chain this method
 is as secure as if the child zone had been signed.
+
+#### Operator coordination via HSYNCPARAM
+
+The KEY record at `_sig0key.{child}._signal.{nameserver}.` must be
+published by the operator of the nameserver's zone, not by the
+operator of the child zone. The child operator therefore needs a
+mechanism to instruct each of the child's nameserver operators (in
+the multi-provider case, possibly several distinct operators) that
+they should publish the KEY record under the appropriate
+`_sig0key.{child}._signal.{their-ns-name}.` name within their own
+zone.
+
+This document recommends, but does not require, that this
+instruction be conveyed via the `pubkey` SvcParamKey of the
+HSYNCPARAM record defined in
+{{?I-D.leon-dnsop-signaling-zone-owner-intent}}. HSYNCPARAM is
+published in the child zone, and the providers of the child zone
+are authoritative for that zone and can therefore observe
+HSYNCPARAM directly. The `pubkey` signal expresses the child
+operator's intent that each provider SHOULD publish the child's
+SIG(0) KEY at `_sig0key.{child}._signal.{their-ns-name}.` in
+their own zone.
+
+The mechanics of how each provider acts on this signal
+(operational coordination, provisioning APIs, internal handoffs,
+etc.) are out of scope for this document.
 
 ### Automatic Bootstrap When Child Zone Is Unsigned
 
@@ -861,7 +893,7 @@ from any parent name server even in the worst case the only service
 that can be subject to an attack is the UPDATE Receiver itself, which
 is a service that previously did not exist.
 
-# IANA Considerations
+# IANA Considerations {#iana}
 
 IANA is requested to assign a new "scheme" value to the registry for
 "DSYNC Location of Synchronization Endpoints" as follows:
@@ -872,6 +904,19 @@ Reference
 | RRtype | Scheme | Purpose               | Reference       |
 | ------ | ------ | --------------------- | --------------- |
 | ANY    |    TBD | Delegation management | (this document) |
+
+IANA is also requested to add the following entry to the
+"Underscored and Globally Scoped DNS Node Names" registry
+{{!RFC8552}}, alongside the entries added by {{!RFC9615}}:
+
+| RR Type | _NODE NAME | Reference       |
+| ------- | ---------- | --------------- |
+| KEY     | _signal    | (this document) |
+
+This entry records that the `_signal` underscored label registered
+by {{!RFC9615}} is also used for SIG(0) key bootstrap in this
+document. See {{automatic-bootstrap-when-child-nameserver-is-in-a-dnssec-signed-zone}}
+for the name pattern in which this label is used.
 
 -------
 
