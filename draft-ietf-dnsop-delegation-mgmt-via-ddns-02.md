@@ -444,7 +444,90 @@ operators are encouraged to adopt them for the SIG(0) key on this
 path: there is no operational reason to prefer a classical
 algorithm here.
 
-## Bootstrapping the SIG(0) Public Key Into the DNS UPDATE Receiver
+## Communication Between Child and Parent UPDATE Receiver
+
+There are two cases where communication between child and parent
+UPDATE Receiver would benefit greatly from some additional
+information. The bootstrap states named in the subsections below
+are defined in {{bootstrapping-sig0-public-keys}}.
+
+### Communication in Case of Errors
+
+An error response from the parent UPDATE Receiver would be improved by
+more detail provided via a set of new Extended DNS Error Codes
+{{!RFC8914}}. In particular, it would be useful to be able to express
+the following "states":
+
+* "SIG(0) key is known, but not yet trusted": indicating that
+  bootstrap of the key is not yet complete. Waiting may resolve the
+  issue.
+
+* "SIG(0) key is known, but validation failed": indicating that
+  bootstrap has failed and waiting will not resolve the issue.
+
+* "Automatic bootstrap of SIG(0) keys not supported; manual bootstrap
+  required": indicating that while the parent does support delegation
+  synchronization via DNS UPDATE, it only supports manual
+  bootstrap. Note that the child should normally discover this via the
+  SVCB "bootstrap" SvcParamKey before attempting automatic bootstrap;
+  this error serves as a fallback for cases where that discovery was
+  not performed or the SVCB record was not available.
+
+### Communication To Inquire State
+
+Extended DNS Errors {{!RFC8914}} provides an excellent mechanism
+for adding more detail to error responses. However it is,
+intentionally, limited to:
+
+* returning extra information from the receiver to the original
+  sender. It is not possible to "send" information, only "return"
+  information.
+
+* no information except the actual error code is meant for automatic
+  processing. It is therefore not possible to communicate things like,
+  eg. a KeyId via Extended DNS Errors.
+
+The communication between child and parent would benefit from the
+addition of the ability to also send inquiries to the parent. For
+example, the child should be able to inquire about key state: "I
+operate under the assumption that the key {key} is known and trusted
+by you (the parent). Is this correct?"
+
+{{?I-D.berra-dnsop-keystate}} is proposed as a mechanism to improve
+the communication between child and parent, both in the error case and
+in the inquiry case. If that draft is supported then the above
+example would travel as "KeyState codes" in a KeyState OPT as
+specified in {{?I-D.berra-dnsop-keystate}}.
+
+## Mutual Authentication
+
+For the KeyState communication described above to be trustworthy, the
+child must be able to verify that responses from the UPDATE Receiver
+are authentic. Otherwise an adversary could potentially cause
+disruption by sending forged responses, e.g. falsely claiming that
+the child's key is unknown and triggering an unnecessary re-bootstrap.
+
+For this reason the UPDATE Receiver SHOULD also maintain a SIG(0) key
+pair and use its private key to sign responses to the child. This
+enables mutual authentication: the child authenticates to the parent
+via its SIG(0) signature on the UPDATE, and the parent authenticates
+to the child via its SIG(0) signature on the response.
+
+The bootstrap problem therefore arises in both directions: the parent
+needs to acquire and trust the child's SIG(0) public key, and the
+child needs to acquire and trust the UPDATE Receiver's SIG(0) public
+key. {{bootstrapping-sig0-public-keys}} covers both halves.
+
+## Bootstrapping SIG(0) Public Keys {#bootstrapping-sig0-public-keys}
+
+This chapter has two halves. The first describes how the parent
+UPDATE Receiver acquires and trusts the child's SIG(0) public key.
+The second describes how the child acquires and trusts the UPDATE
+Receiver's SIG(0) public key. Both halves use the same underlying
+DNS-based discovery and DNSSEC-validation pattern, applied to the
+two parties in turn.
+
+### Bootstrapping the Child's Key Into the UPDATE Receiver
 
 Bootstrap of the child public SIG(0) key to be trusted by the UPDATE
 Receiver may be done either manually or automatically. Manually
@@ -491,7 +574,7 @@ for subsequent validation. The following three subsections describe
 the three automatic bootstrap methods this document defines, one per
 case of child-zone signing status.
 
-### Automatic Bootstrap When Child Zone Is DNSSEC-signed
+#### When Child Zone Is DNSSEC-signed
 
 If the child zone is DNSSEC-signed (including a signed delegation via
 a DS record), then the KEY record containing the SIG(0) public key
@@ -508,7 +591,7 @@ In case of validation failure (or absence of a DNSSEC signature) the
 SIG(0) SHOULD NOT be promoted to the set of keys that the UPDATE
 Receiver trusts and any old keys MUST be kept.
 
-### Automatic Bootstrap When Child Nameserver Is In A DNSSEC-signed Zone
+#### When Child Nameserver Is In A DNSSEC-signed Zone
 
 If the child zone is unsigned but at least one of the authoritative
 nameservers for the zone is located in a DNSSEC-signed zone (including
@@ -573,7 +656,7 @@ The mechanics of how each provider acts on this signal
 (operational coordination, provisioning APIs, internal handoffs,
 etc.) are out of scope for this document.
 
-### Automatic Bootstrap When Child Zone Is Unsigned
+#### When Child Zone Is Unsigned
 
 Hence, to bootstrap the public SIG(0) key for a child zone it is
 possible for the parent to use a "bootstrap policy" a la:
@@ -614,6 +697,34 @@ previous methods but it is possible to make on-path attacks
 arbitrarily difficult by using a larger number of repeated queries
 from a larger number of vantage points.
 
+### Bootstrapping the UPDATE Receiver's Key Into the Child
+
+#### Publishing the UPDATE Receiver's Key
+
+The UPDATE Receiver SHOULD publish its public SIG(0) key as a KEY
+record at the domain name that is the {target} of the DSYNC record.
+Example:
+
+    _dsync.parent.example.      IN DSYNC ANY UPDATE 0 updater.parent.example.
+    updater.parent.example.     IN KEY ...
+
+#### Acquiring and Validating the UPDATE Receiver's Key
+
+The child needs to acquire and validate the UPDATE Receiver's public
+SIG(0) key before it can verify signed responses. Two methods are
+defined:
+
+  * If the KEY record for the UPDATE Receiver is located in a
+    DNSSEC-signed zone (which is expected in the common case where
+    the parent zone is DNSSEC-signed), the child looks up the KEY
+    record and performs standard DNSSEC validation. On validation
+    success the key is trusted.
+
+  * If the KEY record is not in a DNSSEC-signed zone, manual
+    bootstrap is required. The same out-of-band mechanisms available
+    for bootstrapping the child key (email, web form, etc.) may be
+    used in reverse.
+
 ## Publishing Supported Bootstrap Methods
 
 As there are multiple possible methods to bootstrap the initial SIG(0)
@@ -641,7 +752,7 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
         child.parent.  IN KEY ... 
         child.parent.  IN RRSIG KEY ... 
 
-       See [Automatic Bootstrap When Child Zone Is DNSSEC-signed](#automatic-bootstrap-when-child-zone-is-dnssec-signed)
+       See [When Child Zone Is DNSSEC-signed](#when-child-zone-is-dnssec-signed)
 
   * "at-ns":   This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key by publishing
@@ -656,14 +767,14 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
         _sig0key.{child}._signal.ns.provider.com.  IN KEY ... 
         _sig0key.{child}._signal.ns.provider.com.  IN RRSIG KEY ... 
 
-       See [Automatic Bootstrap When Child Nameserver Is In A DNSSEC-signed Zone](#automatic-bootstrap-when-child-nameserver-is-in-a-dnssec-signed-zone)
+       See [When Child Nameserver Is In A DNSSEC-signed Zone](#when-child-nameserver-is-in-a-dnssec-signed-zone)
 
   * "unsigned": This method is similar to what {{!RFC8078}} describes
                 for CDS bootstrapping.
 
         child.parent.     IN KEY ... 
 
-       See [Automatic Bootstrap When Child Zone Is Unsigned](#automatic-bootstrap-when-child-zone-is-unsigned)
+       See [When Child Zone Is Unsigned](#when-child-zone-is-unsigned)
 
   * "manual":  This is an indication that the UPDATE Receiver supports some other
                mechanism for bootstrap of the SIG(0) public key.
@@ -684,100 +795,6 @@ supports the secure automatic bootstrap methods "at-apex" and
 
 I.e. this UPDATE Receiver does not support the "unsigned" method based
 on {{!RFC8078}}.
-
-## Communication Between Child and Parent UPDATE Receiver
-
-There are two cases where communication between child and parent
-UPDATE Receiver would benefit greatly from some additional
-information.
-
-### Communication in Case of Errors
-
-An error response from the parent UPDATE Receiver would be improved by
-more detail provided via a set of new Extended DNS Error Codes
-{{!RFC8914}}. In particular, it would be useful to be able to express
-the following "states":
-
-* "SIG(0) key is known, but not yet trusted": indicating that
-  bootstrap of the key is not yet complete. Waiting may resolve the
-  issue.
-
-* "SIG(0) key is known, but validation failed": indicating that
-  bootstrap has failed and waiting will not resolve the issue.
-
-* "Automatic bootstrap of SIG(0) keys not supported; manual bootstrap
-  required": indicating that while the parent does support delegation
-  synchronization via DNS UPDATE, it only supports manual
-  bootstrap. Note that the child should normally discover this via the
-  SVCB "bootstrap" SvcParamKey before attempting automatic bootstrap;
-  this error serves as a fallback for cases where that discovery was
-  not performed or the SVCB record was not available.
-
-### Communication To Inquire State
-
-Extended DNS Errors {{!RFC8914}} provides an excellent mechanism
-for adding more detail to error responses. However it is,
-intentionally, limited to:
-
-* returning extra information from the receiver to the original
-  sender. It is not possible to "send" information, only "return"
-  information.
-
-* no information except the actual error code is meant for automatic
-  processing. It is therefore not possible to communicate things like,
-  eg. a KeyId via Extended DNS Errors.
-
-The communication between child and parent would benefit from the
-addition of the ability to also send inquiries to the parent. For
-example, the child should be able to inquire about key state: "I
-operate under the assumption that the key {key} is known and trusted
-by you (the parent). Is this correct?"
-
-{{?I-D.berra-dnsop-keystate}} is proposed as a mechanism to improve
-the communication between child and parent, both in the error case and
-in the inquiry case. If that draft is supported then the above
-example would travel as "KeyState codes" in a KeyState OPT as
-specified in {{?I-D.berra-dnsop-keystate}}.
-
-## Mutual Authentication and the UPDATE Receiver SIG(0) Key
-
-For the KeyState communication described above to be trustworthy, the
-child must be able to verify that responses from the UPDATE Receiver
-are authentic. Otherwise an adversary could potentially cause
-disruption by sending forged responses, e.g. falsely claiming that
-the child's key is unknown and triggering an unnecessary re-bootstrap.
-
-For this reason the UPDATE Receiver SHOULD also maintain a SIG(0) key
-pair and use its private key to sign responses to the child. This
-enables mutual authentication: the child authenticates to the parent
-via its SIG(0) signature on the UPDATE, and the parent authenticates
-to the child via its SIG(0) signature on the response.
-
-### Publishing the UPDATE Receiver SIG(0) Key
-
-The UPDATE Receiver SHOULD publish its public SIG(0) key as a KEY
-record at the domain name that is the {target} of the DSYNC record.
-Example:
-
-    _dsync.parent.example.      IN DSYNC ANY UPDATE 0 updater.parent.example.
-    updater.parent.example.     IN KEY ...
-
-### Bootstrapping the UPDATE Receiver Key to the Child
-
-The child needs to acquire and validate the UPDATE Receiver's public
-SIG(0) key before it can verify signed responses. Two methods are
-defined:
-
-  * If the KEY record for the UPDATE Receiver is located in a
-    DNSSEC-signed zone (which is expected in the common case where
-    the parent zone is DNSSEC-signed), the child looks up the KEY
-    record and performs standard DNSSEC validation. On validation
-    success the key is trusted.
-
-  * If the KEY record is not in a DNSSEC-signed zone, manual
-    bootstrap is required. The same out-of-band mechanisms available
-    for bootstrapping the child key (email, web form, etc.) may be
-    used in reverse.
 
 ## Rolling the SIG(0) Key
 
