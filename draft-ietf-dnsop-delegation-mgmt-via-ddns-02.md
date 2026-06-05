@@ -555,22 +555,23 @@ is as secure as if the child zone had been signed.
 The KEY record at `_sig0key.{child}._signal.{nameserver}.` must be
 published by the operator of the nameserver's zone, not by the
 operator of the child zone. The child operator therefore needs a
-mechanism to instruct each of the child's nameserver operators (in
-the multi-provider case, possibly several distinct operators) that
-they should publish the KEY record under the appropriate
+mechanism to instruct each of the child's nameserver operators
+that they should publish the KEY record under the appropriate
 `_sig0key.{child}._signal.{their-ns-name}.` name within their own
 zone.
 
 This document recommends, but does not require, that this
-instruction be conveyed via the `pubkey` SvcParamKey of the
-HSYNCPARAM record defined in
-{{?I-D.leon-dnsop-signaling-zone-owner-intent}}. HSYNCPARAM is
-published in the child zone, and the providers of the child zone
-are authoritative for that zone and can therefore observe
-HSYNCPARAM directly. The `pubkey` signal expresses the child
-operator's intent that each provider SHOULD publish the child's
-SIG(0) KEY at `_sig0key.{child}._signal.{their-ns-name}.` in
-their own zone.
+instruction be conveyed via the HSYNCPARAM record defined in
+{{?I-D.leon-dnsop-signaling-zone-owner-intent}}, using a key
+(tentatively named `pubkey`) in that record. The set of
+HSYNCPARAM keys is defined by that document and is *not* part of
+the SvcParamKey registry; the final name and IANA arrangements
+for this key are still under discussion. HSYNCPARAM is published
+in the child zone, and the providers of the child zone are
+authoritative for that zone and can therefore observe HSYNCPARAM
+directly. The `pubkey` signal expresses the child operator's
+intent that each provider SHOULD publish the child's SIG(0) KEY
+at `_sig0key.{child}._signal.{their-ns-name}.` in their own zone.
 
 The mechanics of how each provider acts on this signal
 (operational coordination, provisioning APIs, internal handoffs,
