@@ -36,6 +36,22 @@ author:
 normative:
 
 informative:
+  FIPS204:
+    title: "Module-Lattice-Based Digital Signature Standard"
+    target: "https://csrc.nist.gov/pubs/fips/204/final"
+    author:
+      - org: "National Institute of Standards and Technology (NIST)"
+    date: 2024-08
+    seriesinfo:
+      FIPS: "204"
+  FIPS205:
+    title: "Stateless Hash-Based Digital Signature Standard"
+    target: "https://csrc.nist.gov/pubs/fips/205/final"
+    author:
+      - org: "National Institute of Standards and Technology (NIST)"
+    date: 2024-08
+    seriesinfo:
+      FIPS: "205"
 
 --- abstract
 
@@ -399,6 +415,34 @@ but it doesn't have to be. The SIG(0) public key only needs to be
 available to the parent DNS UPDATE Receiver. Keeping all the public
 SIG(0) keys for different child zones in some sort of database is
 perfectly fine.
+
+## Choice of SIG(0) Signature Algorithm
+
+The child's SIG(0) public key is, in the common case, discoverable
+in DNS: either at the child apex, or at the
+`_sig0key.{child}._signal.{nameserver}.` name in the nameserver's
+zone, or via multi-query convergence against the child KEY RRset.
+In each case the public key is recoverable by any party that can
+issue DNS queries. An adversary capable of breaking the signature
+algorithm of the SIG(0) key from the public key alone can therefore
+forge DNS UPDATEs to the parent UPDATE Receiver and substitute
+arbitrary delegation information. The integrity of the entire
+mechanism rests on the SIG(0) key remaining unforgeable for the
+operational lifetime of the delegation.
+
+For this reason the SIG(0) key SHOULD use an algorithm that is
+expected to remain secure against a cryptographically relevant
+quantum computer (CRQC). Suitable post-quantum signature algorithms
+include ML-DSA {{?FIPS204}} and SLH-DSA {{?FIPS205}}.
+
+The DNS UPDATEs described in this document are infrequent and are
+carried over TCP. Unlike DNSSEC validation traffic, which is
+size-sensitive because of the per-query UDP path, this path imposes
+no significant wire-size constraint on the SIG(0) signature. The
+larger public keys and signatures of post-quantum algorithms are
+therefore not a deployment obstacle for SIG(0) on the DDNS UPDATE
+path even though they would be a serious obstacle on most
+ordinary DNSSEC paths.
 
 ## Bootstrapping the SIG(0) Public Key Into the DNS UPDATE Receiver
 
