@@ -444,6 +444,11 @@ operators are encouraged to adopt them for the SIG(0) key on this
 path: there is no operational reason to prefer a classical
 algorithm here.
 
+The experimental algorithm code-point range proposed in
+{{?I-D.johani-dnsop-dnssec-alg-experimental-ranges}} provides one
+path by which a PQ-safe algorithm can be used on this path before
+full IETF standardization completes.
+
 ## Communication Between Child and Parent UPDATE Receiver
 
 There are two cases where communication between child and parent
