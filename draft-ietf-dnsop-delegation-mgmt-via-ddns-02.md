@@ -382,9 +382,19 @@ UPDATE via publication of an appropriate target location record.
 
 A response with rcode=17 ("BADKEY") should be interpreted as a
 definitive statement that the DNS UPDATE Receiver does not have access
-to the public SIG(0) key needed for signature verification. In this
-case the child should fall back to bootstrap of the SIG(0) public key
-into the DNS UPDATE Receiver, see below.
+to the public SIG(0) key needed for signature verification, i.e. that
+the key is unknown to the receiver. In this case the child should fall
+back to bootstrap of the SIG(0) public key into the DNS UPDATE
+Receiver, see below.
+
+BADKEY does not distinguish the intermediate states in which the
+receiver has the key but has not yet trusted it (for example, a
+bootstrap that is in progress, where the child should wait, or one
+whose validation has failed, where re-bootstrapping will not help).
+Those states are conveyed via the Extended DNS Error codes of
+{{communication-in-case-of-errors}}; a child that receives BADKEY
+without such an error treats the key as unknown and (re-)initiates
+bootstrap.
 
 ## No response to a DNS UPDATE
 
@@ -392,26 +402,22 @@ The case of no response is more complex, as it is not possible to know
 whether the DNS UPDATE actually reached the receiver (or was lost in
 transit) or the response was not sent (or lost in transit).
 
-For this reason the exact response to a missing reply is left as
-implementation dependent. That way the implementation has sufficient
-freedom to choose a sensible approach. Eg. if the sender of the DNS
-UPDATE message (perhaps the primary name server of the child zone) only
-serves a single child, then resending the DNS UPDATE once or twice may
-be ok (to ensure that the lack of response is not due to packets being
-lost in transit). On the other hand, if the sender serves a large
-number of child zones below the same parent zone, then it may already
-know that the receiver for the DNS UPDATEs is not responding for any
-of the child zones, and then resending the update immediately is
-likely pointless.
+Whether and how to retry depends on the sender's situation. For
+example, if the sender of the DNS UPDATE message (perhaps the primary
+name server of the child zone) only serves a single child, then
+resending the DNS UPDATE once or twice may be worthwhile (to ensure
+that the lack of response is not due to packets being lost in
+transit). On the other hand, if the sender serves a large number of
+child zones below the same parent zone, then it may already know that
+the receiver for the DNS UPDATEs is not responding for any of the
+child zones, and resending the update immediately is likely pointless.
 
-As a baseline for senders that do retry: a sender SHOULD wait at
-least 5 seconds before treating the absence of a response as a
-timeout, SHOULD apply exponential backoff between successive retries
-(e.g. doubling the interval each time), and SHOULD give up after no
-more than 5 retries for a given UPDATE. These numbers are intended
-as defaults that an implementation may override based on local
-knowledge (such as the per-receiver observations described above);
-they are not normative wire-protocol requirements.
+A sender that retries SHOULD wait at least 5 seconds before treating
+the absence of a response as a timeout, SHOULD apply exponential
+backoff between successive retries (e.g. doubling the interval each
+time), and SHOULD give up after no more than 5 retries for a given
+UPDATE. A sender MAY deviate from these defaults based on local
+knowledge, such as the per-receiver observations described above.
 
 # Management of SIG(0) Public Keys
 
@@ -594,6 +600,17 @@ trusted) and then either put that key into a queue for later look up
 and validation of the corresponding KEY record (if supporting
 automatic bootstrap) or put that key into a queue for subsequent
 manual validation and verification.
+
+A self-signature is made by the very key being added, so its
+validation proves only that the sender possesses the corresponding
+private key; it does not, by itself, prove that the sender is
+authorized to manage the child's delegation. That authorization is
+established only by the subsequent validation step (DNSSEC validation
+of the published KEY, or manual verification) before the key is
+promoted to "trusted". For this reason the receiver MUST NOT act on
+the "DEL ... ANY KEY" instruction in a bootstrap UPDATE to remove an
+already-trusted key until the newly added key has been validated (see
+{{re-bootstrapping-in-case-of-errors}}).
 
 Automated bootstrapping is also possible, subject to the policy of the
 UPDATE Receiver. The basic idea is to publish the public SIG(0) key as
@@ -801,11 +818,14 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
 
   * "at-ns":   This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key by publishing
-               the DNSSEC-signed KEY record both at the zone apex AND at
-               the special name "_sig0key.{child}._signal.{nameserver}."
+               the KEY record both at the child zone apex AND at the
+               special name "_sig0key.{child}._signal.{nameserver}."
                below the name of an authoritative nameserver located in a
-               signed zone. This mechanism is similar to what is described
-               in {{!RFC9615}} for CDS bootstrap:
+               signed zone. The apex KEY is published so that the
+               nameserver operators can re-publish it under the special
+               name, where it is DNSSEC-signed and can be validated. This
+               mechanism is similar to what is described in {{!RFC9615}}
+               for CDS bootstrap:
 
         child.parent.     IN NS ns.provider.com.
         child.parent.     IN KEY ... 
