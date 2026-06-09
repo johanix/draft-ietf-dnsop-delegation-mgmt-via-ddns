@@ -379,11 +379,15 @@ be published in the parent zone at some future time.
 
 ## RCODE REFUSED
 
-A response with rcode=5 ("REFUSED") should be interpreted as a
-permanent signal that DNS UPDATEs are not supported by the
-receiver. This would indicate a parent misconfiguration, as the UPDATE
-should not be sent unless the parent has announced support for DNS
-UPDATE via publication of an appropriate target location record.
+A response with rcode=5 ("REFUSED") should be interpreted as the
+receiver declining to process the UPDATE. Because the child only sends
+an UPDATE after the parent has announced support for it via
+publication of an appropriate target location record, a persistent
+REFUSED most likely indicates a parent-side misconfiguration. REFUSED
+may, however, also be a transient condition (for example a policy or
+rate-limit rejection, see {{security-considerations}}); a child
+SHOULD NOT treat a single REFUSED as a permanent signal to stop, but
+MAY do so after repeated REFUSED responses over time.
 
 ## RCODE BADKEY
 
@@ -515,7 +519,7 @@ intentionally, limited to:
 
 * no information except the actual error code is meant for automatic
   processing. It is therefore not possible to communicate things like,
-  eg. a KeyId via Extended DNS Errors.
+  e.g. a KeyId via Extended DNS Errors.
 
 The communication between child and parent would benefit from the
 addition of the ability to also send inquiries to the parent. For
@@ -564,7 +568,7 @@ key. {{bootstrapping-sig0-public-keys}} covers both halves.
 
 ## Bootstrapping SIG(0) Public Keys {#bootstrapping-sig0-public-keys}
 
-This chapter has two halves. The first describes how the parent
+This section has two parts. The first describes how the parent
 UPDATE Receiver acquires and trusts the child's SIG(0) public key.
 The second describes how the child acquires and trusts the UPDATE
 Receiver's SIG(0) public key. Both halves use the same underlying
@@ -825,7 +829,7 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
         child.parent.  IN KEY ... 
         child.parent.  IN RRSIG KEY ... 
 
-       See [When Child Zone Is DNSSEC-signed](#when-child-zone-is-dnssec-signed)
+       See {{when-child-zone-is-dnssec-signed}}.
 
   * "at-ns":   This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key by publishing
@@ -843,14 +847,14 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
         _sig0key.{child}._signal.ns.provider.com.  IN KEY ... 
         _sig0key.{child}._signal.ns.provider.com.  IN RRSIG KEY ... 
 
-       See [When Child Nameserver Is In A DNSSEC-signed Zone](#when-child-nameserver-is-in-a-dnssec-signed-zone)
+       See {{when-child-nameserver-is-in-a-dnssec-signed-zone}}.
 
   * "unsigned": This method is similar to what {{!RFC8078}} describes
                 for CDS bootstrapping.
 
         child.parent.     IN KEY ... 
 
-       See [When Child Zone Is Unsigned](#when-child-zone-is-unsigned)
+       See {{when-child-zone-is-unsigned}}.
 
   * "manual":  This is an indication that the UPDATE Receiver supports some other
                mechanism for bootstrap of the SIG(0) public key.
