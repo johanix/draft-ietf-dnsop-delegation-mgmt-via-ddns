@@ -129,21 +129,26 @@ when, and only when, they appear in all capitals, as shown here.
 ## Terminology
 
 SIG(0)
-: An asymmetric signing algorithm that allows the recipient to only
-  need to know the public key to verify a signature created by the
+: The DNS transaction authentication mechanism of {{!RFC2931}}, which
+  uses asymmetric (public-key) cryptography so that the recipient needs
+  only the sender's public key to verify a signature created with the
   sender's private key.
 
 UPDATE Receiver
-: The entity that receives and processes DNS UPDATE messages on behalf
-  of the parent zone. This may be the parent primary name server or a
-  separate dedicated service.
+: The logical role that receives and processes DNS UPDATE messages on
+  behalf of, or under the authority of, the parent zone operator. This
+  role MAY be co-located with the parent's primary name server, run as
+  a separate dedicated service operated by the parent, or operated by a
+  third party (such as a registrar) on the parent's behalf. This
+  document uses the single term "UPDATE Receiver" for this role
+  throughout.
 
 Bootstrap
 : The process of establishing initial trust in a SIG(0) public key.
   A key that has been received but not yet validated is "known"; once
   validated it is promoted to "trusted".
 
-# Is there a Use Case?
+# Applicability
 
 Because of the drawbacks of CDS and CSYNC scanners they are unlikely
 to be able to fully automate the maintenance of delegation information
@@ -205,10 +210,12 @@ still differs from DNSSEC, since a SIG(0) key is trusted individually
 through a chain of signatures back to a trust anchor.
 
 DNS UPDATEs can be used to update any information in a zone (subject
-to the policy of the recipient). But in the special case where the
-data that is updated is the delegation information for a child zone
-and it is sent across a zone cut (i.e. the child sends it to the
-parent), it acts as a glorified generalized NOTIFY.
+to the policy of the recipient). In the special case addressed by this
+document, the data being updated is the delegation information for a
+child zone and the UPDATE is sent across a zone cut (i.e. the child
+sends it to the parent). In this case the UPDATE serves the same
+signalling purpose as a generalized NOTIFY, but additionally carries
+the exact change and the proof of its authenticity.
 
 The DNS UPDATE in this case is essentially a message that says:
 
@@ -218,9 +225,9 @@ The DNS UPDATE in this case is essentially a message that says:
 
 # Updating Delegation Information via DNS UPDATEs
 
-This is not a new idea. There is lots of prior art and prior
-documents, including the expired
-I-D.andrews-dnsop-update-parent-zones-04.
+Updating delegation information in the parent via DNS UPDATE is not a
+new idea; there is prior art, including the expired
+{{?I-D.andrews-dnsop-update-parent-zones}}.
 
 The functionality to update delegation information in the parent zone
 via DNS UPDATE has been available for years in at least one DNS
@@ -324,7 +331,7 @@ of the corresponding information in the parent zone. This includes:
 
 Only for those specific cases is the described mechanism proposed. 
 
-# The DNS UPDATE Receiver
+# The UPDATE Receiver
 
 While the simplest design is to send the DNS UPDATEs to the primary
 name server of the parent it will in most cases be more interesting to
@@ -332,7 +339,7 @@ send them to a separate UPDATE Receiver. To separate the primary name
 server from the UPDATE Receiver, use a {target} with addresses
 separate from the addresses of the primary name server.
 
-## Processing the UPDATE in the DNS UPDATE Receiver 
+## Processing the UPDATE in the UPDATE Receiver {#processing-the-update}
 
 The receiver of the DNS UPDATE messages should implement a suitably 
 strict policy for what updates are accepted (typically only allowing 
@@ -381,7 +388,7 @@ UPDATE via publication of an appropriate target location record.
 ## RCODE BADKEY
 
 A response with rcode=17 ("BADKEY") should be interpreted as a
-definitive statement that the DNS UPDATE Receiver does not have access
+definitive statement that the UPDATE Receiver does not have access
 to the public SIG(0) key needed for signature verification, i.e. that
 the key is unknown to the receiver. In this case the child should fall
 back to bootstrap of the SIG(0) public key into the DNS UPDATE
@@ -424,7 +431,7 @@ knowledge, such as the per-receiver observations described above.
 Only the child should have access to the SIG(0) private key. The
 corresponding SIG(0) public key should preferably be published in DNS,
 but it doesn't have to be. The SIG(0) public key only needs to be
-available to the parent DNS UPDATE Receiver. Keeping all the public
+available to the parent UPDATE Receiver. Keeping all the public
 SIG(0) keys for different child zones in some sort of database is
 perfectly fine.
 
@@ -450,7 +457,7 @@ larger public keys and signatures of post-quantum algorithms will
 therefore not be a deployment obstacle for SIG(0) on the DDNS UPDATE
 path even though they would be a serious obstacle on most ordinary
 DNSSEC paths. As post-quantum signature algorithms such as ML-DSA
-{{?FIPS204}} and SLH-DSA {{?FIPS205}} become standardized for
+{{FIPS204}} and SLH-DSA {{FIPS205}} become standardized for
 DNSSEC use and are supported by parent UPDATE Receivers, child
 operators are encouraged to adopt them for the SIG(0) key on this
 path: there is no operational reason to prefer a classical
@@ -793,12 +800,16 @@ As there are multiple possible methods to bootstrap the initial SIG(0)
 public key to become trusted by the parent it becomes important for
 child zone operators to be able to find out which method to use.
 
-This document utilizes the same mechanism as used in
-{{?I-D.berra-dnsop-announce-scanner}} to announce details about CDS and
-CSYNC scanner capabilities. This mechanism uses an SVCB record located
-at the target of the DSYNC record to announce capabilities. For the
-UPDATE Receiver the important capabilities are primarily supported
-bootstrap methods.
+For this purpose, a parent that operates an UPDATE Receiver MAY
+publish an SVCB record {{!RFC9460}} at the {target} of the DSYNC
+record, announcing the capabilities of that UPDATE Receiver. This
+re-uses the SVCB-at-DSYNC-target convention introduced by
+{{?I-D.berra-dnsop-announce-scanner}} (where it announces CDS and
+CSYNC scanner capabilities). The relevant capability for the UPDATE
+Receiver is the set of supported bootstrap methods, carried in the
+"bootstrap" SvcParamKey defined below; this document describes that
+use in full, so it does not depend on
+{{?I-D.berra-dnsop-announce-scanner}} for interoperability.
 
 ### SvcParamKey "bootstrap" {#svcparamkey-bootstrap}
 
@@ -863,7 +874,7 @@ on {{!RFC8078}}.
 
 ## Rolling the SIG(0) Key
 
-Once the parent (or registrar) DNS UPDATE Receiver has the key, the
+Once the parent (or registrar) UPDATE Receiver has the key, the
 child can update it via a DNS UPDATE just like updating the NS RRset,
 the DS RRset or the glue in the parent zone (assuming a suitable DNS
 UPDATE policy in the parent). I.e. only the initial bootstrapping of
@@ -975,7 +986,7 @@ is a service that previously did not exist.
 ## Authorization Scoping
 
 The most important parent-side authorization control is the name-
-scoping rule of {{processing-the-update-in-the-dns-update-receiver}}:
+scoping rule of {{processing-the-update}}:
 the receiver SHOULD only accept an UPDATE to the delegation
 information of `child.parent.` when it is signed by a trusted SIG(0)
 key named `child.parent.`. This binds the authority to change a
