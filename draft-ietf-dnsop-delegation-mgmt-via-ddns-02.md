@@ -196,9 +196,13 @@ recipient trusts).
 In this document the term "Dynamic Update" or "DNS UPDATE" implies
 secure dynamic update. Furthermore this document implies that the
 signature algorithms are always based on asymmetric crypto keys, using
-the same algorithms as are being used for DNSSEC. I.e. by using the
-right algorithm the resulting signatures will be as strong as
-DNSSEC-signatures.
+the same algorithms as are being used for DNSSEC. With an appropriate
+choice of algorithm the SIG(0) signature is therefore as
+cryptographically strong as a DNSSEC signature. Note that this is a
+statement about the signature primitive only: the overall trust model
+still differs from DNSSEC, since a SIG(0) key is trusted individually
+(via the bootstrap of {{bootstrapping-sig0-public-keys}}) rather than
+through a chain of signatures back to a trust anchor.
 
 DNS UPDATEs can be used to update any information in a zone (subject
 to the policy of the recipient). But in the special case where the
@@ -334,13 +338,15 @@ The receiver of the DNS UPDATE messages should implement a suitably
 strict policy for what updates are accepted (typically only allowing 
 updates to the NS RRset, glue and DS RRset). 
 
-Furthermore, it is strongly recommended that the policy is further
-tightened by only allowing updates to the delegation information of a
-child zone with the exact same name as the name of the SIG(0) key that
-signed the UPDATE request. I.e. an UPDATE request for the delegation
-information for the zone `child.parent.` should only be processed if
-it is signed by a SIG(0) key with the name `child.parent.` and the
-signature verifies correctly.
+Furthermore, the receiver SHOULD further tighten the policy by only
+allowing updates to the delegation information of a child zone when
+the UPDATE is signed by a SIG(0) key whose name is the exact same name
+as the child zone. I.e. an UPDATE request for the delegation
+information for the zone `child.parent.` is only processed if it is
+signed by a trusted SIG(0) key with the name `child.parent.` and the
+signature verifies correctly. This name-scoping rule is the primary
+parent-side authorization control and is discussed further in
+{{security-considerations}}.
 
 Once the DNS UPDATE message has been verified to be correctly signed
 by a known and trusted key with the correct name and also adhere to
@@ -522,7 +528,21 @@ For this reason the UPDATE Receiver SHOULD also maintain a SIG(0) key
 pair and use its private key to sign responses to the child. This
 enables mutual authentication: the child authenticates to the parent
 via its SIG(0) signature on the UPDATE, and the parent authenticates
-to the child via its SIG(0) signature on the response.
+to the child via its SIG(0) signature on the response. When the child
+makes key-state inquiries (for example via the KeyState mechanism of
+{{?I-D.berra-dnsop-keystate}}), the UPDATE Receiver MUST sign its
+responses, since an unsigned response to such an inquiry is exactly
+the forged-response vector described above.
+
+Mutual authentication depends on the child being able to validate the
+UPDATE Receiver's key (see
+{{acquiring-and-validating-the-update-receivers-key}}). In the common
+case the parent zone is DNSSEC-signed and this validation is
+automatic. When the parent zone is unsigned, the child can only obtain
+the Receiver's key via manual bootstrap; absent that, mutual
+authentication is unavailable, and responses cannot be authenticated —
+leaving the forged-response disruption above as a residual risk that
+the operator accepts.
 
 The bootstrap problem therefore arises in both directions: the parent
 needs to acquire and trust the child's SIG(0) public key, and the
@@ -700,13 +720,27 @@ performs its normal verifications of a change and then transforms the
 update into an EPP {{!RFC5730}} transaction to communicate it to the
 registry.
 
-This bootstrap mechanism for the case of an unsigned child is
-essentially identical to the "automatic DNSSEC Bootstrap via CDS"
-service a la {{!RFC8078}} that multiple TLD registries provide
-today. It does not provide the provable authenticity of the two
-previous methods but it is possible to make on-path attacks
-arbitrarily difficult by using a larger number of repeated queries
-from a larger number of vantage points.
+This bootstrap mechanism for the case of an unsigned child reuses the
+"acceptance" method standardized in {{!RFC8078}} for automatic DNSSEC
+bootstrapping via CDS, which multiple TLD registries provide today.
+Its security properties and limitations are therefore those of
+{{!RFC8078}}, not new ones introduced here: it does not provide the
+provable authenticity of the two DNSSEC-validated methods above, and
+its strength against on-path attackers increases with the number and
+diversity of vantage points and transports used, but it cannot exceed
+the authenticity of the child's own authoritative servers.
+
+In particular, this method authenticates the current operator of the
+child's delegation, not the registrant: an attacker who controls (or
+is on-path to all of) the child's authoritative name servers can
+present a chosen KEY. That exposure, however, is not introduced by
+this mechanism — such an attacker can already manipulate the child
+zone regardless. The remedies (using reputable providers, and signing
+the child zone, which enables the stronger at-apex and at-ns methods)
+are out of scope for this document. For these reasons this is the
+weakest of the defined bootstrap methods; a parent advertises whether
+it supports it via the "unsigned" token of the "bootstrap"
+SvcParamKey ({{svcparamkey-bootstrap}}).
 
 ### Bootstrapping the UPDATE Receiver's Key Into the Child
 
@@ -716,7 +750,7 @@ The UPDATE Receiver SHOULD publish its public SIG(0) key as a KEY
 record at the domain name that is the {target} of the DSYNC record.
 Example:
 
-    _dsync.parent.example.      IN DSYNC ANY UPDATE 0 updater.parent.example.
+    _dsync.parent.example.      IN DSYNC ANY UPDATE 5302 updater.parent.example.
     updater.parent.example.     IN KEY ...
 
 #### Acquiring and Validating the UPDATE Receiver's Key
@@ -801,7 +835,7 @@ Example for a parent that operates an UPDATE Receiver that only
 supports the secure automatic bootstrap methods "at-apex" and
 "at-ns". Otherwise "manual" bootstrap is needed.
 
-    _dsync.parent.example.   IN  DSYNC ANY UPDATE 0 updater.parent.example.
+    _dsync.parent.example.   IN  DSYNC ANY UPDATE 5302 updater.parent.example.
     updater.parent.example.  IN  SVCB 0 . (bootstrap="at-apex,at-ns,manual")
 
 I.e. this UPDATE Receiver does not support the "unsigned" method based
@@ -917,6 +951,69 @@ Furthermore, as the location of the UPDATE Receiver can be separated
 from any parent name server even in the worst case the only service
 that can be subject to an attack is the UPDATE Receiver itself, which
 is a service that previously did not exist.
+
+## Authorization Scoping
+
+The most important parent-side authorization control is the name-
+scoping rule of {{processing-the-update-in-the-dns-update-receiver}}:
+the receiver SHOULD only accept an UPDATE to the delegation
+information of `child.parent.` when it is signed by a trusted SIG(0)
+key named `child.parent.`. This binds the authority to change a
+child's delegation to possession of a key bootstrapped specifically
+for that child, and prevents one child (or one compromised key) from
+altering the delegation of another. Receivers that relax this rule
+(for example to allow a registrar-operated key to manage many
+children) take on the corresponding responsibility for authorizing
+each change by other means.
+
+## SIG(0) Key Bootstrap
+
+The trust the UPDATE Receiver places in a child's SIG(0) key is only
+as strong as the bootstrap method used to acquire it. The at-apex and
+at-ns methods derive trust from a DNSSEC signature chain and are as
+strong as DNSSEC. The "unsigned" method (see
+{{when-child-zone-is-unsigned}}) reuses the {{!RFC8078}} acceptance
+method and authenticates only the current operator of the child's
+authoritative servers, not the registrant; it is the weakest method
+and cannot defend against an attacker who controls those servers
+(an exposure that exists independently of this mechanism).
+
+A receiver discovers which bootstrap methods a child can use, and a
+child discovers which methods a parent supports, via the "bootstrap"
+SvcParamKey ({{svcparamkey-bootstrap}}). Because that SVCB record is
+published in the parent's zone, an attacker able to forge it could
+attempt a downgrade — steering a child toward the weaker "unsigned"
+method. A parent that supports DNSSEC SHOULD sign the SVCB record so
+that children can detect such tampering; a child SHOULD prefer the
+strongest method the parent advertises that it can satisfy.
+
+During (re-)bootstrap the receiver MUST NOT delete a previously
+trusted key until a newly presented key has been validated (see
+{{re-bootstrapping-in-case-of-errors}}). This prevents an attacker
+from using a forged or self-signed bootstrap UPDATE to evict a good
+key and substitute its own.
+
+## Authenticating Responses
+
+Responses from the UPDATE Receiver are authenticated only when the
+receiver signs them with its own SIG(0) key and the child has
+validated that key (see {{mutual-authentication}}). When the parent
+zone is unsigned and no manual receiver-key bootstrap has been
+performed, responses cannot be authenticated, and an attacker able to
+inject responses could, for example, falsely report a key as unknown
+and trigger unnecessary re-bootstrap. This is a denial/disruption
+risk rather than an integrity risk: it cannot cause an unauthorized
+delegation change. Whether to act on unauthenticated responses when
+receiver-key trust cannot be established is subject to local policy.
+
+## Replay
+
+A DNS UPDATE in this mechanism is protected by its SIG(0) signature,
+whose validity is bounded by the inception and expiration times of
+the signature {{!RFC2931}}. Receivers MUST reject UPDATEs whose
+signature time is outside an acceptable window, and the window
+SHOULD be kept small, to limit the value of a captured UPDATE to an
+attacker.
 
 # IANA Considerations {#iana}
 
