@@ -297,12 +297,12 @@ The DSYNC RRset is looked up, typically by the child primary name
 server or by a separate agent for the child, at the time that the
 delegation information for the child zone changes in some way that
 would prompt an update in the parent zone. When the {scheme} is
-"UPDATE" (i.e. the number 2 in the wire protocol) the interpretation
-is:
+"UPDATE" (the scheme value assigned by IANA in {{iana}}) the
+interpretation is:
 
 `Send a DNS UPDATE to the IP address for the name {target} on port
-5302, where {target} is the domain name in the right-hand side of the
-DSYNC record that matches the qname in the DNS query.`
+{port}, where {target} and {port} are taken from the right-hand side
+of the DSYNC record that matches the qname in the DNS query.`
 
 # Limitation of Scope for the Proposed Mechanism 
 
@@ -445,7 +445,7 @@ path: there is no operational reason to prefer a classical
 algorithm here.
 
 The experimental algorithm code-point range proposed in
-{{?I-D.johani-dnsop-dnssec-alg-experimental-ranges}} provides one
+{{?I-D.johani-dnsop-dnssec-alg-experimental-range}} provides one
 path by which a PQ-safe algorithm can be used on this path before
 full IETF standardization completes.
 
@@ -458,10 +458,10 @@ are defined in {{bootstrapping-sig0-public-keys}}.
 
 ### Communication in Case of Errors
 
-An error response from the parent UPDATE Receiver would be improved by
-more detail provided via a set of new Extended DNS Error Codes
-{{!RFC8914}}. In particular, it would be useful to be able to express
-the following "states":
+An error response from the parent UPDATE Receiver is improved by
+more detail provided via Extended DNS Errors {{!RFC8914}}. To that
+end this document defines three new Extended DNS Error codes (see
+{{iana}}), expressing the following bootstrap "states":
 
 * "SIG(0) key is known, but not yet trusted": indicating that
   bootstrap of the key is not yet complete. Waiting may resolve the
@@ -477,6 +477,12 @@ the following "states":
   SVCB "bootstrap" SvcParamKey before attempting automatic bootstrap;
   this error serves as a fallback for cases where that discovery was
   not performed or the SVCB record was not available.
+
+These Extended DNS Error codes are the always-available baseline
+channel for conveying key-state detail in error responses. A richer,
+optional channel — able to carry inquiries and key identifiers for
+automated processing — is provided by the KeyState OPT of
+{{?I-D.berra-dnsop-keystate}}, described in {{communication-to-inquire-state}}.
 
 ### Communication To Inquire State
 
@@ -743,7 +749,7 @@ at the target of the DSYNC record to announce capabilities. For the
 UPDATE Receiver the important capabilities are primarily supported
 bootstrap methods.
 
-### SvcParamKey "bootstrap"
+### SvcParamKey "bootstrap" {#svcparamkey-bootstrap}
 
 The "bootstrap" SvcParamKey in the SVCB record is used to signal what
 mechanisms are supported for bootstrapping the trust of the child's public
@@ -924,7 +930,9 @@ Reference
 | ------ | ------ | --------------------- | --------------- |
 | ANY    |    TBD | Delegation management | (this document) |
 
-IANA is also requested to add the following entry to the
+## Underscored Node Name
+
+IANA is requested to add the following entry to the
 "Underscored and Globally Scoped DNS Node Names" registry
 {{!RFC8552}}, alongside the entries added by {{!RFC9615}}:
 
@@ -932,10 +940,60 @@ IANA is also requested to add the following entry to the
 | ------- | ---------- | --------------- |
 | KEY     | _signal    | (this document) |
 
-This entry records that the `_signal` underscored label registered
-by {{!RFC9615}} is also used for SIG(0) key bootstrap in this
-document. See {{automatic-bootstrap-when-child-nameserver-is-in-a-dnssec-signed-zone}}
-for the name pattern in which this label is used.
+{{!RFC9615}} registered the `_signal` global underscored label for
+the CDS and CDNSKEY RR types; this document adds an entry for the KEY
+RR type at the same global label, for SIG(0) key bootstrap. See
+{{when-child-nameserver-is-in-a-dnssec-signed-zone}} for the name
+pattern in which this label is used. The subordinate label `_sig0key`
+introduced by this document
+(in `_sig0key.{child}._signal.{nameserver}.`) is not separately
+registered: per {{!RFC8552}}, only the global underscored node name
+(`_signal`) is registered, and labels subordinate to it are the
+responsibility of the specification that uses the global label.
+
+## SVCB SvcParamKey "bootstrap"
+
+IANA is requested to register a new SvcParamKey in the "Service
+Binding (SVCB) Parameter Registry" (per Section 14.3.2 of
+{{!RFC9460}}):
+
+| Number | Name      | Meaning                                   | Reference       |
+| ------ | --------- | ----------------------------------------- | --------------- |
+| TBD    | bootstrap | SIG(0) key bootstrap methods supported    | (this document) |
+
+The format and use of this SvcParamKey are defined in
+{{svcparamkey-bootstrap}}. Its value is a comma-separated list of
+tokens from the "DSYNC SIG(0) Bootstrap Mechanisms" registry below.
+
+## DSYNC SIG(0) Bootstrap Mechanisms Registry
+
+IANA is requested to create a new registry, "DSYNC SIG(0) Bootstrap
+Mechanisms", to hold the tokens that may appear in the value of the
+"bootstrap" SvcParamKey. The registration policy is Specification
+Required ({{!RFC8126}}). Each entry has a token (a short
+case-sensitive string), a brief description, and a reference. The
+initial contents are:
+
+| Token    | Description                                                | Reference       |
+| -------- | ---------------------------------------------------------- | --------------- |
+| at-apex  | KEY published, DNSSEC-signed, at the child zone apex       | (this document) |
+| at-ns    | KEY published under `_sig0key.{child}._signal.{nameserver}` in a signed nameserver zone | (this document) |
+| unsigned | RFC 8078-style multiple-vantage-point acceptance           | (this document) |
+| manual   | Out-of-band / manual bootstrap                             | (this document) |
+
+## Extended DNS Error Codes
+
+IANA is requested to register three new Extended DNS Error codes in
+the "Extended DNS Error Codes" registry {{!RFC8914}}:
+
+| INFO-CODE | Purpose                                          | Reference       |
+| --------- | ------------------------------------------------ | --------------- |
+| TBD       | SIG(0) key known but not yet trusted             | (this document) |
+| TBD       | SIG(0) key known but validation failed           | (this document) |
+| TBD       | Automatic SIG(0) bootstrap not supported; manual bootstrap required | (this document) |
+
+The meaning and intended use of these codes are described in
+{{communication-in-case-of-errors}}.
 
 -------
 
