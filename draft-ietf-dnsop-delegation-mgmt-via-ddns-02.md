@@ -267,7 +267,7 @@ following format:
     {qname}   IN  DSYNC  {RRtype} {scheme} {port} {target}
 
 where {target} is the domain name of the recipient of the NOTIFY
-message. {RRtype} is typically "CDS" or "CSYNC" in the case where
+message. {RRtype} is typically CDS or CSYNC in the case where
 delegation information should be updated (there are also other uses of
 generalized notifications). 
 
@@ -348,7 +348,7 @@ updates to the NS RRset, glue and DS RRset).
 Furthermore, the receiver SHOULD further tighten the policy by only
 allowing updates to the delegation information of a child zone when
 the UPDATE is signed by a SIG(0) key whose name is the exact same name
-as the child zone. I.e. an UPDATE request for the delegation
+as the child zone, i.e., an UPDATE request for the delegation
 information for the zone `child.parent.` is only processed if it is
 signed by a trusted SIG(0) key with the name `child.parent.` and the
 signature verifies correctly. This name-scoping rule is the primary
@@ -372,14 +372,14 @@ responses to DNS UPDATE are fully documented in {{!RFC2136}}, section
 
 ## RCODE NOERROR
 
-A response with rcode=0 ("NOERROR") should be interpreted as a
+A response with rcode=0 (NOERROR) should be interpreted as a
 confirmation that the DNS UPDATE has been received and
-accepted. I.e. the change to the parent DNS data should be expected to
+accepted, i.e., the change to the parent DNS data should be expected to
 be published in the parent zone at some future time.
 
 ## RCODE REFUSED
 
-A response with rcode=5 ("REFUSED") should be interpreted as the
+A response with rcode=5 (REFUSED) should be interpreted as the
 receiver declining to process the UPDATE. Because the child only sends
 an UPDATE after the parent has announced support for it via
 publication of an appropriate target location record, a persistent
@@ -391,7 +391,7 @@ MAY do so after repeated REFUSED responses over time.
 
 ## RCODE BADKEY
 
-A response with rcode=17 ("BADKEY") should be interpreted as a
+A response with rcode=17 (BADKEY) should be interpreted as a
 definitive statement that the UPDATE Receiver does not have access
 to the public SIG(0) key needed for signature verification, i.e. that
 the key is unknown to the receiver. In this case the child should fall
@@ -497,7 +497,7 @@ end this document defines three new Extended DNS Error codes (see
   required": indicating that while the parent does support delegation
   synchronization via DNS UPDATE, it only supports manual
   bootstrap. Note that the child should normally discover this via the
-  SVCB "bootstrap" SvcParamKey before attempting automatic bootstrap;
+  SVCB `bootstrap` SvcParamKey before attempting automatic bootstrap;
   this error serves as a fallback for cases where that discovery was
   not performed or the SVCB record was not available.
 
@@ -619,7 +619,7 @@ authorized to manage the child's delegation. That authorization is
 established only by the subsequent validation step (DNSSEC validation
 of the published KEY, or manual verification) before the key is
 promoted to "trusted". For this reason the receiver MUST NOT act on
-the "DEL ... ANY KEY" instruction in a bootstrap UPDATE to remove an
+the `DEL ... ANY KEY` instruction in a bootstrap UPDATE to remove an
 already-trusted key until the newly added key has been validated (see
 {{re-bootstrapping-in-case-of-errors}}).
 
@@ -658,7 +658,7 @@ a signed delegation via a DS record), then the KEY record containing
 the SIG(0) public key can be looked up and validated by the DNS UPDATE
 Receiver.
 
-Example: assume that the unsigned child zone "child.parent." has
+Example: assume that the unsigned child zone `child.parent.` has
 two nameservers:
 
     child.parent.  IN NS ns.child.parent.
@@ -669,7 +669,7 @@ and a KEY record located under that name can not be DNSSEC-validated.
 ns.provider.example. on the other hand is located in a DNSSEC signed
 zone.  In this case the KEY record containing the public SIG(0) key
 for child.parent.  may be located at the special label
-"_sig0key.{child}._signal.{nameserver}":
+`_sig0key.{child}._signal.{nameserver}`:
 
     _sig0key.child.parent._signal.ns.provider.example. IN KEY ...
     _sig0key.child.parent._signal.ns.provider.example. IN RRSIG KEY ...
@@ -767,7 +767,7 @@ zone regardless. The remedies (using reputable providers, and signing
 the child zone, which enables the stronger at-apex and at-ns methods)
 are out of scope for this document. For these reasons this is the
 weakest of the defined bootstrap methods; a parent advertises whether
-it supports it via the "unsigned" token of the "bootstrap"
+it supports it via the `unsigned` token of the `bootstrap`
 SvcParamKey ({{svcparamkey-bootstrap}}).
 
 ### Bootstrapping the UPDATE Receiver's Key Into the Child
@@ -811,17 +811,17 @@ re-uses the SVCB-at-DSYNC-target convention introduced by
 {{?I-D.berra-dnsop-announce-scanner}} (where it announces CDS and
 CSYNC scanner capabilities). The relevant capability for the UPDATE
 Receiver is the set of supported bootstrap methods, carried in the
-"bootstrap" SvcParamKey defined below; this document describes that
+`bootstrap` SvcParamKey defined below; this document describes that
 use in full, so it does not depend on
 {{?I-D.berra-dnsop-announce-scanner}} for interoperability.
 
-### SvcParamKey "bootstrap" {#svcparamkey-bootstrap}
+### SvcParamKey `bootstrap` {#svcparamkey-bootstrap}
 
-The "bootstrap" SvcParamKey in the SVCB record is used to signal what
+The `bootstrap` SvcParamKey in the SVCB record is used to signal what
 mechanisms are supported for bootstrapping the trust of the child's public
 SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
 
-  * "at-apex": This is an indication that the UPDATE Receiver supports
+  * `at-apex`: This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key for signed
                child zones by the child publishing the DNSSEC-signed
                KEY record at the child zone apex.
@@ -831,10 +831,10 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
 
        See {{when-child-zone-is-dnssec-signed}}.
 
-  * "at-ns":   This is an indication that the UPDATE Receiver supports
+  * `at-ns`:   This is an indication that the UPDATE Receiver supports
                automatic bootstrap of the SIG(0) public key by publishing
                the KEY record both at the child zone apex AND at the
-               special name "_sig0key.{child}._signal.{nameserver}."
+               special name `_sig0key.{child}._signal.{nameserver}.`
                below the name of an authoritative nameserver located in a
                signed zone. The apex KEY is published so that the
                nameserver operators can re-publish it under the special
@@ -849,31 +849,31 @@ SIG(0) key to the UPDATE Receiver. Four mechanisms are currently identified:
 
        See {{when-child-nameserver-is-in-a-dnssec-signed-zone}}.
 
-  * "unsigned": This method is similar to what {{!RFC8078}} describes
+  * `unsigned`: This method is similar to what {{!RFC8078}} describes
                 for CDS bootstrapping.
 
         child.parent.     IN KEY ... 
 
        See {{when-child-zone-is-unsigned}}.
 
-  * "manual":  This is an indication that the UPDATE Receiver supports some other
+  * `manual`:  This is an indication that the UPDATE Receiver supports some other
                mechanism for bootstrap of the SIG(0) public key.
 
-The value of the "bootstrap" key is a string with one or more of the supported
-mechanisms, separated by ",". The mechanisms may occur in arbitrary order.
+The value of the `bootstrap` key is a string with one or more of the supported
+mechanisms, separated by `,`. The mechanisms may occur in arbitrary order.
 
 New mechanisms are likely to be defined in the future.
 
 ### Complete Example
 
 Example for a parent that operates an UPDATE Receiver that only
-supports the secure automatic bootstrap methods "at-apex" and
-"at-ns". Otherwise "manual" bootstrap is needed.
+supports the secure automatic bootstrap methods `at-apex` and
+`at-ns`. Otherwise `manual` bootstrap is needed.
 
     _dsync.parent.example.   IN  DSYNC ANY UPDATE 5302 updater.parent.example.
     updater.parent.example.  IN  SVCB 0 . (bootstrap="at-apex,at-ns,manual")
 
-I.e. this UPDATE Receiver does not support the "unsigned" method based
+That is, this UPDATE Receiver does not support the `unsigned` method based
 on {{!RFC8078}}.
 
 ## Rolling the SIG(0) Key
@@ -881,7 +881,7 @@ on {{!RFC8078}}.
 Once the parent (or registrar) UPDATE Receiver has the key, the
 child can update it via a DNS UPDATE just like updating the NS RRset,
 the DS RRset or the glue in the parent zone (assuming a suitable DNS
-UPDATE policy in the parent). I.e. only the initial bootstrapping of
+UPDATE policy in the parent), i.e., only the initial bootstrapping of
 the key is an issue.
 
 Note, however, that the alternative of re-bootstrapping (by whatever
@@ -1006,7 +1006,7 @@ each change by other means.
 The trust the UPDATE Receiver places in a child's SIG(0) key is only
 as strong as the bootstrap method used to acquire it. The at-apex and
 at-ns methods derive trust from a DNSSEC signature chain and are as
-strong as DNSSEC. The "unsigned" method (see
+strong as DNSSEC. The `unsigned` method (see
 {{when-child-zone-is-unsigned}}) reuses the {{!RFC8078}} acceptance
 method and authenticates only the current operator of the child's
 authoritative servers, not the registrant; it is the weakest method
@@ -1014,10 +1014,10 @@ and cannot defend against an attacker who controls those servers
 (an exposure that exists independently of this mechanism).
 
 A receiver discovers which bootstrap methods a child can use, and a
-child discovers which methods a parent supports, via the "bootstrap"
+child discovers which methods a parent supports, via the `bootstrap`
 SvcParamKey ({{svcparamkey-bootstrap}}). Because that SVCB record is
 published in the parent's zone, an attacker able to forge it could
-attempt a downgrade — steering a child toward the weaker "unsigned"
+attempt a downgrade — steering a child toward the weaker `unsigned`
 method. A parent that supports DNSSEC SHOULD sign the SVCB record so
 that children can detect such tampering; a child SHOULD prefer the
 strongest method the parent advertises that it can satisfy.
@@ -1052,7 +1052,7 @@ attacker.
 
 # IANA Considerations {#iana}
 
-IANA is requested to assign a new "scheme" value to the registry for
+IANA is requested to assign a new scheme value to the registry for
 "DSYNC Location of Synchronization Endpoints" as follows:
 
 Reference
@@ -1083,7 +1083,7 @@ registered: per {{!RFC8552}}, only the global underscored node name
 (`_signal`) is registered, and labels subordinate to it are the
 responsibility of the specification that uses the global label.
 
-## SVCB SvcParamKey "bootstrap"
+## SVCB SvcParamKey `bootstrap`
 
 IANA is requested to register a new SvcParamKey in the "Service
 Binding (SVCB) Parameter Registry" (per Section 14.3.2 of
@@ -1101,7 +1101,7 @@ tokens from the "DSYNC SIG(0) Bootstrap Mechanisms" registry below.
 
 IANA is requested to create a new registry, "DSYNC SIG(0) Bootstrap
 Mechanisms", to hold the tokens that may appear in the value of the
-"bootstrap" SvcParamKey. The registration policy is Specification
+`bootstrap` SvcParamKey. The registration policy is Specification
 Required ({{!RFC8126}}). Each entry has a token (a short
 case-sensitive string), a brief description, and a reference. The
 initial contents are:
@@ -1150,7 +1150,7 @@ The meaning and intended use of these codes are described in
 
 > Restructured §Management of SIG(0) Public Keys to expose the
 > two-direction bootstrap symmetry: §Mutual Authentication now
-> motivates a single §Bootstrapping SIG(0) Public Keys chapter
+> motivates a single §Bootstrapping SIG(0) Public Keys section
 > with subsections for the child's key and the UPDATE Receiver's
 > key.
 
