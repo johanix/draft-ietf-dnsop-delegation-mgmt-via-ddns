@@ -503,8 +503,8 @@ end this document defines three new Extended DNS Error codes (see
 
 These Extended DNS Error codes are the always-available baseline
 channel for conveying key-state detail in error responses. A richer,
-optional channel — able to carry inquiries and key identifiers for
-automated processing — is provided by the KeyState OPT of
+optional channel - able to carry inquiries and key identifiers for
+automated processing - is provided by the KeyState OPT of
 {{?I-D.berra-dnsop-keystate}}, described in {{communication-to-inquire-state}}.
 
 ### Communication To Inquire State
@@ -557,7 +557,7 @@ UPDATE Receiver's key (see
 case the parent zone is DNSSEC-signed and this validation is
 automatic. When the parent zone is unsigned, the child can only obtain
 the Receiver's key via manual bootstrap; absent that, mutual
-authentication is unavailable, and responses cannot be authenticated —
+authentication is unavailable, and responses cannot be authenticated -
 leaving the forged-response disruption above as a residual risk that
 the operator accepts.
 
@@ -762,7 +762,7 @@ In particular, this method authenticates the current operator of the
 child's delegation, not the registrant: an attacker who controls (or
 is on-path to all of) the child's authoritative name servers can
 present a chosen KEY. That exposure, however, is not introduced by
-this mechanism — such an attacker can already manipulate the child
+this mechanism - such an attacker can already manipulate the child
 zone regardless. The remedies (using reputable providers, and signing
 the child zone, which enables the stronger at-apex and at-ns methods)
 are out of scope for this document. For these reasons this is the
@@ -1017,7 +1017,7 @@ A receiver discovers which bootstrap methods a child can use, and a
 child discovers which methods a parent supports, via the `bootstrap`
 SvcParamKey ({{svcparamkey-bootstrap}}). Because that SVCB record is
 published in the parent's zone, an attacker able to forge it could
-attempt a downgrade — steering a child toward the weaker `unsigned`
+attempt a downgrade - steering a child toward the weaker `unsigned`
 method. A parent that supports DNSSEC SHOULD sign the SVCB record so
 that children can detect such tampering; a child SHOULD prefer the
 strongest method the parent advertises that it can satisfy.
@@ -1148,16 +1148,16 @@ The meaning and intended use of these codes are described in
 
 * draft-ietf-dnsop-delegation-mgmt-via-ddns-02
 
-> Restructured §Management of SIG(0) Public Keys to expose the
-> two-direction bootstrap symmetry: §Mutual Authentication now
-> motivates a single §Bootstrapping SIG(0) Public Keys section
+> Restructured Section Management of SIG(0) Public Keys to expose the
+> two-direction bootstrap symmetry: Section Mutual Authentication now
+> motivates a single Section Bootstrapping SIG(0) Public Keys section
 > with subsections for the child's key and the UPDATE Receiver's
 > key.
 
-> Added §Choice of SIG(0) Signature Algorithm covering the case
+> Added Section Choice of SIG(0) Signature Algorithm covering the case
 > for adopting a PQ-safe algorithm on this path once available.
 
-> Added §Operator coordination via HSYNCPARAM (a `pubkey` key in
+> Added Section Operator coordination via HSYNCPARAM (a `pubkey` key in
 > the HSYNCPARAM record from draft-leon-dnsop-signaling-zone-owner-intent)
 > for the at-ns bootstrap method, and an IANA request for a
 > (KEY, _signal) entry in the RFC 8552 registry.
