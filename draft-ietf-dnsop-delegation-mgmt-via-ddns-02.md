@@ -4,6 +4,7 @@ abbrev: DDNS Updates of Delegation Information
 docname: draft-ietf-dnsop-delegation-mgmt-via-ddns-02
 date: {DATE}
 category: std
+submissiontype: IETF
 
 ipr: trust200902
 area: Internet
@@ -229,6 +230,16 @@ Updating delegation information in the parent via DNS UPDATE is not a
 new idea; there is prior art, including the expired
 {{?I-D.andrews-dnsop-update-parent-zones}}.
 
+This document does not define a new update mechanism. The child's
+update to the delegation information is an ordinary DNS UPDATE
+{{!RFC2136}}, secured as a SIG(0)-signed transaction {{!RFC3007}}
+{{!RFC2931}}; the NS, glue and DS changes it carries, and the way the
+UPDATE Receiver processes them, are exactly as specified there. What
+this document adds is a way for the parent to announce, via the DSYNC
+mechanism {{!RFC9859}}, whether it accepts such updates for a given
+child and where they are to be sent, together with the SIG(0) key
+management needed to authenticate them across the zone cut.
+
 The functionality to update delegation information in the parent zone
 via DNS UPDATE has been available for years in at least one DNS
 implementation (BIND9). However, while DNS UPDATE is used extensively
@@ -342,26 +353,42 @@ separate from the addresses of the primary name server.
 ## Processing the UPDATE in the UPDATE Receiver {#processing-the-update}
 
 The receiver of the DNS UPDATE messages should implement a suitably 
-strict policy for what updates are accepted (typically only allowing 
-updates to the NS RRset, glue and DS RRset). 
+strict policy for what updates are accepted. Two distinct classes of
+update are in scope. The first is updates to the delegation
+information itself, where the policy typically allows only changes to
+the NS RRset, glue and DS RRset. The second is updates to the child's
+KEY RRset used to authenticate these UPDATEs; KEY changes are accepted
+only as part of the bootstrap and re-bootstrap procedures described in
+{{bootstrapping-sig0-public-keys}}, and are subject to the additional
+validation rules stated there (in particular, a previously trusted key
+MUST NOT be removed until the replacement key has been validated). A
+single UPDATE used for delegation maintenance is not expected to also
+carry KEY changes.
 
-Furthermore, the receiver SHOULD further tighten the policy by only
-allowing updates to the delegation information of a child zone when
-the UPDATE is signed by a SIG(0) key whose name is the exact same name
-as the child zone, i.e., an UPDATE request for the delegation
-information for the zone `child.parent.` is only processed if it is
-signed by a trusted SIG(0) key with the name `child.parent.` and the
-signature verifies correctly. This name-scoping rule is the primary
-parent-side authorization control and is discussed further in
+Furthermore, the receiver MUST only allow updates to the delegation
+information of a child zone when the UPDATE is signed by a trusted
+SIG(0) key whose name is the exact same name as the child zone, unless
+the receiver implements an alternative authorization scheme (for
+example a registrar-operated key authorized to manage many children).
+That is, in the absence of such a scheme, an UPDATE request for the
+delegation information for the zone `child.parent.` is only processed
+if it is signed by a trusted SIG(0) key with the name `child.parent.`
+and the signature verifies correctly. This name-scoping rule is the
+primary parent-side authorization control and is discussed further in
 {{security-considerations}}.
 
 Once the DNS UPDATE message has been verified to be correctly signed
 by a known and trusted key with the correct name and also adhere to
 the update policy it should be subjected to the same set of
-correctness tests as a CDS/CSYNC scanner would have performed. If these
-requirements are also fulfilled the change may be applied to the
-parent zone in whatever manner the parent zone is maintained (as a
-text file, data in a database, via an API, etc).
+correctness tests as a CDS/CSYNC scanner would have performed. For DS
+changes these are the acceptance checks defined for CDS/CDNSKEY
+processing in {{?RFC7344}} and {{?RFC8078}}; for NS and glue changes
+they are the checks defined for CSYNC processing in {{?RFC7477}}. The
+parent applies the same policy regardless of whether the change
+arrives by scanning or by DNS UPDATE. If these requirements are also
+fulfilled the change may be applied to the parent zone in whatever
+manner the parent zone is maintained (as a text file, data in a
+database, via an API, etc).
 
 # Interpretation of the response to the DNS UPDATE
 
@@ -389,7 +416,7 @@ rate-limit rejection, see {{security-considerations}}); a child
 SHOULD NOT treat a single REFUSED as a permanent signal to stop, but
 MAY do so after repeated REFUSED responses over time.
 
-## RCODE BADKEY
+## RCODE BADKEY {#rcode-badkey}
 
 A response with rcode=17 (BADKEY) should be interpreted as a
 definitive statement that the UPDATE Receiver does not have access
@@ -453,8 +480,12 @@ arbitrary delegation information. The integrity of the entire
 mechanism rests on the SIG(0) key remaining unforgeable for the
 operational lifetime of the delegation.
 
-The DNS UPDATEs described in this document are infrequent and are
-carried over TCP. Unlike DNSSEC validation traffic, which is
+The DNS UPDATEs described in this document are infrequent and SHOULD
+be carried over TCP (or a connection-oriented secure transport such
+as DoT); this avoids the spoofing and fragmentation exposure of UDP
+for a message that mutates parent-side state, and accommodates the
+larger SIG(0) signatures discussed below. Unlike DNSSEC validation
+traffic, which is
 size-sensitive because of the per-query UDP path, this path imposes
 no significant wire-size constraint on the SIG(0) signature. The
 larger public keys and signatures of post-quantum algorithms will
@@ -482,9 +513,14 @@ are defined in {{bootstrapping-sig0-public-keys}}.
 ### Communication in Case of Errors
 
 An error response from the parent UPDATE Receiver is improved by
-more detail provided via Extended DNS Errors {{!RFC8914}}. To that
-end this document defines three new Extended DNS Error codes (see
-{{iana}}), expressing the following bootstrap "states":
+more detail provided via Extended DNS Errors {{!RFC8914}}. When the
+child's key is known to the receiver but the UPDATE cannot yet be
+applied because the key is not (or no longer) trusted, the receiver
+returns RCODE REFUSED carrying one of the Extended DNS Error codes
+below; this is distinct from BADKEY, which indicates that the key is
+unknown ({{rcode-badkey}}). To that end this document defines three
+new Extended DNS Error codes (see {{iana}}), expressing the following
+bootstrap "states":
 
 * "SIG(0) key is known, but not yet trusted": indicating that
   bootstrap of the key is not yet complete. Waiting may resolve the
@@ -583,9 +619,12 @@ may in various cases be the preferred method, especially in the case
 of non-registry parents with a small number of child delegations.
 
 If the UPDATE Receiver only supports manual bootstrap, then that is
-what will happen (apart from informing the child about this
-policy). If the child wants to enforce manual bootstrap it needs to
-request this from the UPDATE Receiver.
+what will happen (apart from informing the child about this policy).
+The set of bootstrap methods a parent supports is not negotiated by
+the child; it is advertised by the parent through the `bootstrap`
+SvcParamKey ({{svcparamkey-bootstrap}}). A child that requires manual
+bootstrap therefore selects a parent (or an UPDATE Receiver) that
+advertises `manual`, or arranges it out of band.
 
 In those cases there is by definition some mechanism in place to
 communicate information from the child to the parent, be it email, a
@@ -644,7 +683,11 @@ UPDATE Receiver.
     child.parent. IN RRSIG KEY ...
 
 In case of validation success the key SHOULD be promoted to "trusted"
-by the UPDATE Receiver. At this point any old keys should be deleted.
+by the UPDATE Receiver. At this point any superseded keys SHOULD be
+deleted (note that this is the validation-success path; on the
+re-bootstrap path a previously trusted key MUST NOT be deleted until
+the replacement key has been validated, see
+{{re-bootstrapping-in-case-of-errors}}).
 
 In case of validation failure (or absence of a DNSSEC signature) the
 SIG(0) SHOULD NOT be promoted to the set of keys that the UPDATE
@@ -681,7 +724,11 @@ document to distinguish the SIG(0) bootstrap use case from the
 CDS/CDNSKEY use case defined in {{!RFC9615}}.
 
 In case of validation success the key SHOULD be promoted to "trusted"
-by the UPDATE Receiver. At this point any old keys should be deleted.
+by the UPDATE Receiver. At this point any superseded keys SHOULD be
+deleted (note that this is the validation-success path; on the
+re-bootstrap path a previously trusted key MUST NOT be deleted until
+the replacement key has been validated, see
+{{re-bootstrapping-in-case-of-errors}}).
 
 In case of validation failure (or absence of a DNSSEC signature) the
 SIG(0) SHOULD NOT be promoted to the set of keys that the UPDATE
@@ -737,8 +784,10 @@ possible for the parent to use a "bootstrap policy" a la:
 * If the received KEY RRset is consistent from multiple vantage points
   and multiple times then it is considered authentic and promoted by
   the parent's UPDATE Receiver from "known" to "trusted" SIG(0) key
-  for the child. At this point any old SIG(0) public keys for the
-  child should be deleted.
+  for the child. At this point any superseded SIG(0) public keys for
+  the child SHOULD be deleted (on the validation-success path; see the
+  MUST NOT-delete-until-validated rule for re-bootstrap in
+  {{re-bootstrapping-in-case-of-errors}}).
 
 Should a "registry" parent want to support this mechanism (as a
 service to its unsigned children) then a likely model is that the
@@ -905,13 +954,13 @@ it would use in an UPDATE request.
 In all such cases, as soon as the child becomes aware of the problem
 it should simply re-bootstrap by the same mechanism as used
 initially. The self-signed DNS UPDATE that starts the bootstrapping
-process contains a 
+process contains the instruction
 
     DEL child.parent. {ttl} ANY KEY
 
-and that is an instruction to the parent UPDATE Receiver to delete any
-SIG(0) public keys for this child (and after that start the process to
-validate the new key).
+which directs the parent UPDATE Receiver to delete any SIG(0) public
+keys for this child (and after that to start the process of validating
+the new key).
 
 Note that when receiving such a self-signed DNS UPDATE the parent MUST
 NOT delete any old keys until the new key has been validated and
@@ -990,16 +1039,16 @@ is a service that previously did not exist.
 ## Authorization Scoping
 
 The most important parent-side authorization control is the name-
-scoping rule of {{processing-the-update}}:
-the receiver SHOULD only accept an UPDATE to the delegation
-information of `child.parent.` when it is signed by a trusted SIG(0)
-key named `child.parent.`. This binds the authority to change a
-child's delegation to possession of a key bootstrapped specifically
-for that child, and prevents one child (or one compromised key) from
-altering the delegation of another. Receivers that relax this rule
-(for example to allow a registrar-operated key to manage many
-children) take on the corresponding responsibility for authorizing
-each change by other means.
+scoping rule of {{processing-the-update}}, which requires an UPDATE to
+the delegation information of `child.parent.` to be signed by a
+trusted SIG(0) key named `child.parent.`. This binds the authority to
+change a child's delegation to possession of a key bootstrapped
+specifically for that child, and prevents one child (or one
+compromised key) from altering the delegation of another. The rule
+permits an alternative authorization scheme (for example a
+registrar-operated key authorized to manage many children); a receiver
+that uses one takes on the corresponding responsibility for
+authorizing each change by other means.
 
 ## SIG(0) Key Bootstrap
 
@@ -1118,16 +1167,14 @@ initial contents are:
 IANA is requested to register three new Extended DNS Error codes in
 the "Extended DNS Error Codes" registry {{!RFC8914}}:
 
-| INFO-CODE | Purpose                                          | Reference       |
-| --------- | ------------------------------------------------ | --------------- |
-| TBD       | SIG(0) key known but not yet trusted             | (this document) |
-| TBD       | SIG(0) key known but validation failed           | (this document) |
-| TBD       | Automatic SIG(0) bootstrap not supported; manual bootstrap required | (this document) |
+| INFO-CODE | Mnemonic                  | Purpose                                          | Reference       |
+| --------- | ------------------------- | ------------------------------------------------ | --------------- |
+| TBD       | KEY-KNOWN-NOT-TRUSTED     | SIG(0) key known but not yet trusted             | (this document) |
+| TBD       | KEY-VALIDATION-FAILED     | SIG(0) key known but validation failed           | (this document) |
+| TBD       | MANUAL-BOOTSTRAP-REQUIRED | Automatic SIG(0) bootstrap not supported; manual bootstrap required | (this document) |
 
 The meaning and intended use of these codes are described in
 {{communication-in-case-of-errors}}.
-
--------
 
 # Acknowledgements
 
